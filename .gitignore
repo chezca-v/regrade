@@ -1,0 +1,19 @@
+# Dependencies / Packages
+node_modules/
+venv/
+env/
+__pycache__/
+
+# Environment & Secret Configuration
+.env
+.env.local
+.env.*.local
+
+# Build & Output Directories
+dist/
+build/
+*.log
+
+# OS Specific Files
+.DS_Store
+Thumbs.db
