@@ -1,91 +1,98 @@
-# System Architecture
+# ReGrade system architecture
 
-> A high-level technical overview of the system design, components, and data flow for [Project Name].
+ReGrade is an embedded triage prototype for smartphones and 5 V USB chargers.
+The device under test remains intact throughout testing. Its external mass,
+surface geometry, temperature, and USB input-current measurements are intended
+to inform a locally executed grade and a physical diverter action. The initial
+firmware provides the control-flow scaffold; it deliberately refuses to grade
+or sort while acquisition or calibrated rules are unavailable.
 
----
+## System data flow
 
-## 📐 1. System Overview
-
-Provide a brief summary of how the system works at a macro level. 
-
-* **Architecture Style:** [e.g., Monolithic, Microservices, Serverless, Jamstack]
-* **Core Purpose:** [What architectural goals does this system prioritize? E.g., high availability, low latency, rapid iteration]
-
-```text
-[ High-Level Architecture Diagram / ASCII Art Placeholder ]
-  [Client/Frontend] ---> [API Gateway / Router] ---> [Services / Backend] ---> [Database]
-
+```mermaid
+flowchart LR
+    DUT[Phone or 5 V charger] --> Bed[Load cell and fixed sensor arch]
+    Bed --> ESP[ESP32 DevKit V1]
+    DUT --> USB[Current-limited 5 V test fixture]
+    USB --> ESP
+    ESP --> LCD[16x2 I2C LCD]
+    ESP --> Servo[MG996R diverter]
+    ESP -->|MQTT over TLS| Broker[HiveMQ or Mosquitto]
+    Broker --> Listener[Python MQTT listener]
+    Listener -. planned API integration .-> API[NestJS backend]
+    API -. planned persistence .-> DB[(PostgreSQL / Supabase)]
+    API -. planned data API .-> UI[Next.js dashboard]
+    UI -->|Supabase Auth + publishable key| DB
 ```
 
----
+The device model and its calibrated baseline must be identified before
+measurement interpretation. Firmware-side sensor acquisition, model
+identification, rule-set retrieval, and validated thresholds remain
+implementation work. A failed or incomplete reading produces telemetry and
+does not actuate the sorter.
 
-## 🛠️ 2. Technology Stack & Components
+## Components
 
-Detail the key technologies powering each tier of the application.
-
-| Tier | Technology | Purpose / Rationale |
+| Layer | Component | Responsibility |
 | --- | --- | --- |
-| **Frontend** | [e.g., Next.js / React] | Client-side rendering and UI delivery |
-| **Backend** | [e.g., Node.js / Express or Python / FastAPI] | Business logic, API endpoints, authentication |
-| **Database** | [e.g., PostgreSQL / MongoDB] | Persistent data storage |
-| **Caching / Queue** | [e.g., Redis] | Session management and background job queues |
-| **Infrastructure** | [e.g., Docker, AWS, Vercel] | Hosting, deployment, and containerization |
+| Control | ESP32-WROOM-32D / PlatformIO | Non-blocking session state machine, local UI, MQTT telemetry |
+| Weight | Load cell + HX711 | Device mass after calibration |
+| Geometry | VL53L0X ToF | External thickness estimate against a fixed bed reference |
+| Temperature | MLX90614 | Non-contact surface temperature and rise |
+| Electrical | INA219 and protected 5 V fixture | Input voltage/current measurement; fixture design is not enabled by this firmware |
+| UI/sorting | 16x2 I2C LCD, button, MG996R | Operator prompt and grade-bin diverter |
+| Messaging | MQTT over TLS | Diagnostic telemetry transport |
+| Logging | `cloud/mqtt-listener.py` | Validate JSON object shape and log received telemetry |
+| Dashboard | `dashboard/` (Next.js, TypeScript) | Authenticated read-only interface for Supabase; requires project configuration |
+| Persistence/API | NestJS and PostgreSQL/Supabase | Planned integration; not implemented by this scaffold |
 
----
+The current UI design uses a 16x2 LCD with an I2C backpack. Confirm its I2C
+address and wiring on the assembled hardware. LM358/TL072 filter circuitry and
+IRFZ44N/load design require a reviewed schematic before use; they are not
+software substitutes for a properly isolated, current-limited fixture.
 
-## 🗂️ 3. Directory & Module Structure
+## Firmware states
 
-Explain how the codebase is organized to guide developers where to find or place code.
+1. **IDLE**: wait for a debounced start-button press.
+2. **SCAN**: attempt external sensor acquisition. Missing or uncalibrated
+   readings end the session without a grade or servo action.
+3. **GRADE**: require a valid approved threshold set, then classify.
+4. **SORT**: move the diverter only after a valid grade; wait without blocking.
+5. **REPORT**: publish diagnostic status when the broker is available and show
+   the outcome on the LCD.
 
-```text
-root/
-├── .github/workflows/       # CI/CD automation pipelines
-├── docs/                    # Project documentation (Architecture, API specs)
-├── src/
-│   ├── config/              # Environment configurations & database connections
-│   ├── controllers/         # Request handlers and routing logic
-│   ├── models/              # Data schemas and ORM definitions
-│   ├── services/            # Business logic and external API integrations
-│   ├── utils/               # Helper functions and shared utilities
-│   └── app.ts               # Application entry point / server initialization
-├── tests/                   # Automated unit and integration tests
-└── package.json             # Project dependencies and scripts
+The loop services Wi-Fi/MQTT and the button alongside the state machine. MQTT
+is configured for TLS using a broker CA certificate. Reports are currently
+best-effort; durable buffering and confirmed delivery have not been added.
 
-```
+## Telemetry
 
----
+The firmware publishes JSON at `regrade/<station-id>/diagnostics`. Fields
+include `session_id`, `station_id`, `status`, `grade`, `health_score`,
+`duration_ms`, `sort_success`, `fault`, and a `readings` object. An unavailable
+measurement is serialized as `null`; consumers must not interpret null as a
+passing measurement. The cloud listener currently logs payloads only and does
+not mutate a database or issue commands to the ESP32. The dashboard queries
+the `dashboard_diagnostics` Supabase view using an authenticated session. It
+does not yet consume listener output or a backend API, so the MQTT listener
+must not be assumed to populate database records.
 
-## 🔄 4. Data Flow & Request Lifecycle
+The Supabase migration enables Row Level Security, grants authenticated users
+read-only access to operational data, and withholds device serial/IMEI values
+from the dashboard's database role. Public sign-ups are disabled. The current
+policies model a single shared operator workspace, not multi-tenant access.
 
-Describe how a typical request flows through the system from start to finish.
+## Safety and deployment boundaries
 
-1. **Client Request:** The user triggers an action on the frontend (e.g., submitting a form).
-2. **Routing & Validation:** The API Gateway or backend router receives the request and validates payloads.
-3. **Business Logic Layer:** The controller passes data to the corresponding service layer to execute business rules.
-4. **Data Access:** The service interacts with the database or third-party APIs.
-5. **Response:** The result is returned through the middleware stack back to the client.
-
----
-
-## 🔒 5. Security & Authentication
-
-Outline how security, access control, and data protection are handled.
-
-* **Authentication:** [e.g., JSON Web Tokens (JWT) / OAuth 2.0 / Session-based]
-* **Authorization:** Role-Based Access Control (RBAC) implemented via middleware.
-* **Data Protection:** Environment variables stored securely via GitHub Secrets / Vault; HTTPS enforced in production.
-
----
-
-## 🚀 6. Deployment & Infrastructure
-
-Briefly explain how code moves from development to production.
-
-* **CI/CD Pipeline:** Automated via GitHub Actions (linting and testing run on every PR).
-* **Environments:**
-* `development` — Local machine environment.
-* `staging` — Automated deployment on merges to the `develop` branch.
-* `production` — Manual or automated promotion on releases to the `main` branch.
-
-
-
+- No firmware operation opens a device or removes a battery.
+- Sensor signals indicate possible external signs of a fault; they do not
+  diagnose individual battery cells.
+- No load/current stimulus is implemented. The USB test fixture must be
+  independently reviewed for 5 V limits, current limiting, overcurrent
+  shutdown, fuse protection, isolation, thermal dissipation, and safe failure.
+- Power the MG996R from a suitable separate supply and share ground as required
+  by the reviewed design; never power it from an ESP32 GPIO.
+- Do not rely on the default example configuration. Supply Wi-Fi/MQTT
+  credentials and a trusted CA certificate outside version control.
+- Validate grading rules against a representative mock evaluation set and
+  obtain a hardware safety review before enabling actuation.

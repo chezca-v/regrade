@@ -1,0 +1,5 @@
+-- Canonical Supabase/PostgreSQL schema is maintained as a versioned migration:
+-- ../supabase/migrations/20261012230000_initial_regrade_schema.sql
+--
+-- Apply migrations with the Supabase CLI (`supabase db push`); do not apply a
+-- second independent copy of this schema from the cloud/ directory.

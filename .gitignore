@@ -1,18 +1,26 @@
 # Dependencies / Packages
 node_modules/
 venv/
+.venv/
 env/
 __pycache__/
+*.py[cod]
 
 # Environment & Secret Configuration
 .env
 .env.local
 .env.*.local
+firmware/include/secrets.h
 
 # Build & Output Directories
 dist/
 build/
 *.log
+.pio/
+.next/
+out/
+next-env.d.ts
+/dashboard/AGENTS.md
 
 # OS Specific Files
 .DS_Store
