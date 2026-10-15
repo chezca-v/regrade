@@ -2,6 +2,7 @@
 
 import "./globals.css";
 import React, { useState } from "react";
+import { useRouter } from "next/navigation";
 import { TopNav } from "./components/TopNav";
 import { Pill } from "./components/Pill";
 import { ReadingCard } from "./components/ReadingCard";
@@ -35,6 +36,7 @@ function DeviceIcon() {
 }
 
 export function DiagnosticsPage() {
+  const router = useRouter();
   const [stages] = useState<Stage[]>(STAGES);
   const [queue] = useState<QueueDevice[]>(QUEUE);
   const [selectedQueueId, setSelectedQueueId] = useState<string | null>(null);
@@ -53,7 +55,12 @@ export function DiagnosticsPage() {
               </p>
             </div>
             <div className="rg-titlebar__actions">
-              <button className="rg-btn">View reference weights</button>
+              <button
+                className="rg-btn"
+                onClick={() => router.push("/diagnostics/reference-weights")}
+              >
+                View reference weights
+              </button>
               <button className="rg-btn rg-btn--primary">
                 ＋ New diagnostic test
               </button>
