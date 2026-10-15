@@ -334,12 +334,16 @@ td { border-top: 1px solid #f0f2f1; color: #65736b; font-size: 9px; padding: 9px
 .rg .between{justify-content:space-between}
 .rg .gap6{gap:6px}
 .rg .gap8{gap:8px}
-.rg .card{background:#fff;border-radius:16px;box-shadow:0 1px 3px rgba(20,50,40,.08)}
+.rg .card{background:#fff;border-radius:16px;box-shadow:0 1px 3px rgba(20,50,40,.08);transition:box-shadow .18s,transform .18s}
+.rg .card:hover{box-shadow:0 6px 20px rgba(20,50,40,.13);transform:translateY(-2px)}
+.rg .card.alert:hover{transform:none}
 .rg .pad{padding:24px}
 .rg .titlebar{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:32px}
 .rg .actions{display:flex;gap:12px;align-items:center}
-.rg .btn{font:inherit;font-size:14px;font-weight:500;padding:12px 18px;border-radius:10px;border:1px solid var(--line);background:#fff;color:var(--ink);cursor:pointer}
+.rg .btn{font:inherit;font-size:14px;font-weight:500;padding:12px 18px;border-radius:10px;border:1px solid var(--line);background:#fff;color:var(--ink);cursor:pointer;transition:background .15s,box-shadow .15s}
+.rg .btn:hover{background:#f5f9f7;box-shadow:0 1px 4px rgba(20,50,40,.1)}
 .rg .btn.primary{background:var(--green);border-color:var(--green);color:#fff;font-weight:600}
+.rg .btn.primary:hover{background:var(--green-d);border-color:var(--green-d)}
 .rg .alert{display:flex;align-items:center;gap:16px;padding:28px 24px;border-left:4px solid var(--red);margin-bottom:24px}
 .rg .alert-icon{color:var(--red)}
 .rg .alert-body{flex:1}
@@ -395,6 +399,8 @@ td { border-top: 1px solid #f0f2f1; color: #65736b; font-size: 9px; padding: 9px
 .rg table{width:100%;border-collapse:collapse;font-size:14px}
 .rg th{text-align:left;font-size:12px;font-weight:500;color:#44524d;padding:12px;border-bottom:1px solid var(--line)}
 .rg td{padding:16px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+.rg tbody tr{transition:background .12s;cursor:pointer}
+.rg tbody tr:hover{background:#f5f9f6}
 .rg td.id{font-weight:700}
 .rg .rowwarn{color:var(--red);margin-right:4px;vertical-align:middle}
 .rg .verified{display:inline-flex;gap:6px;align-items:center;font-weight:600}
