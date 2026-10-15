@@ -41,3 +41,43 @@ guidance in [`../CLAUDE.md`](../CLAUDE.md) as well.
   is affected.
 - For docs changed alongside code or configuration, run the relevant checks
   described in the root `CLAUDE.md` and report exactly what ran.
+
+## Implementation History: Dashboard Screens & Routes
+
+The following dashboard screens and routes have been implemented in `dashboard/` with pixel-perfect layouts, responsive design, and live Supabase integration:
+
+1. **Inventory Dashboard (`/inventory`)**:
+   - Location: `dashboard/app/inventory/page.tsx` (re-exported via `dashboard/inventory.tsx`).
+   - Summary KPI cards (*Devices on record*, *Awaiting verification*, *Resellable / Refurbishable*, *Disposal*).
+   - Dynamic audit log data table with segmented filtering tabs (*All devices*, *Resellable*, *Recycle*, *Disposal*, *Needs verification*), search by device ID, and time range selection.
+   - Row-level alert indicators with warning background highlights for disposal devices (e.g., `REG-20261013-004`).
+   - Row click navigation routing directly to the corresponding Device Detail page.
+
+2. **Device Detail Screen (`/inventory/[id]`)**:
+   - Location: `dashboard/app/inventory/[id]/page.tsx`.
+   - Dynamic Server Component fetching live triage records, sensor readings, grading rules, and alerts from Supabase using the URL parameter.
+   - Safety Alert banner with glove handling and quarantine instructions.
+   - Full sensor readings grid (Battery ESR, Power draw, Temperature rise, Casing swell) with limit bars and warning statuses.
+   - "Why this result" rule violation explanation and chronological activity timeline.
+   - Decision card with suggested bin routing and operator action controls.
+   - Device metadata specifications card (model, nominal/measured weight, batch, received timestamp, collection center).
+
+3. **Sorting Screen (`/sorting`)**:
+   - Location: `dashboard/app/sorting/page.tsx`.
+   - Server Component displaying 3-column bin capacity cards (Bin A Resellable, Bin B Recycle, Bin C Disposal) with dynamic progress bars, collection schedules, and hazard alerts.
+   - Routing queue data table showing devices awaiting verification.
+   - Server Actions (`verifyAndRouteAction` and `overrideAction`) to record operator decisions and sort actions in Supabase with path revalidation.
+
+4. **Reference Weights Screen (`/diagnostics/reference-weights`)**:
+   - Location: `dashboard/app/diagnostics/reference-weights/page.tsx` & `table-client.tsx`.
+   - Diagnostics Server Component fetching device model specifications from `device_model`.
+   - Dynamic threshold calculations for accepted tolerance (±5% nominal) and recycle thresholds (< −15% nominal).
+   - Brand filtering dropdown and model search with responsive table pagination.
+
+5. **Settings Screen (`/settings`)**:
+   - Location: `dashboard/app/settings/page.tsx`.
+   - Active settings icon navigation in the top action bar.
+   - Interactive notification toggles (safety alert pop-ups, disposal sounds, verification reminders, daily summaries).
+   - Display configuration dropdowns (weight units, temperature units, time format, language).
+   - Data source card with sample mode toggle and read-only grading limits reference.
+
