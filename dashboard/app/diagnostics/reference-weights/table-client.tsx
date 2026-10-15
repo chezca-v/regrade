@@ -92,7 +92,7 @@ export default function ReferenceWeightsClient({ initialModels }: Props) {
       <div className="rg-card-head">
         <h3>Smartphone models</h3>
         <p className="rg-sub">
-          Placeholder models and weights for design review.
+          Nominal reference weights and thresholds for automated grading.
         </p>
       </div>
 

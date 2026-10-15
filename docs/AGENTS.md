@@ -81,3 +81,10 @@ The following dashboard screens and routes have been implemented in `dashboard/`
    - Display configuration dropdowns (weight units, temperature units, time format, language).
    - Data source card with sample mode toggle and read-only grading limits reference.
 
+6. **Diagnostics Reference Weights & Phone Model Seeding**:
+   - Ingested and normalized verified mobile phone specifications from the GSMArena dataset (`arwinneil/gsmarena-phone-dataset`) and 2020–2025 Mobiles Dataset (`abdulmalik1518/mobiles-dataset-2025`).
+   - Generated database migration `supabase/migrations/20261015170000_seed_phone_reference_weights.sql` and `supabase/seed.sql` populating `public.device_model` with 7,767 unique verified smartphone models with baseline weights (`baseline_weight_g`), physical thickness (`baseline_thickness_mm`), and `ON CONFLICT (brand, model_name, device_type)` upserts.
+   - Updated the Reference Weights screen (`dashboard/app/diagnostics/reference-weights/page.tsx` & `table-client.tsx`) to display 52 curated authentic smartphones (Apple iPhone 16/15/14/13/12/11/SE, Samsung Galaxy S24/S23/S22/A54/A34/Z Flip, Google Pixel 9/8/7/6, OnePlus 12/11, Xiaomi 14, Motorola Edge, Sony Xperia) with exact nominal weights and calculated tolerance ranges (accepted ±5%, recycle <85%).
+   - Restored and polished the layout styling for `/settings` and `/diagnostics/reference-weights` matching ReGrade visual tokens and top navigation.
+   - Verified complete production build (`npm run build`) with zero TypeScript errors.
+
