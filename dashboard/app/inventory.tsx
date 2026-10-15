@@ -228,14 +228,14 @@ export function InventoryPage() {
             <div className="rg-kpi">
               <span className="rg-kpi__label">Resellable / Refurbishable</span>
               <span className="rg-kpi__value" style={{ color: "var(--rg-safe)" }}>
-                612
+                {resellableCount}
               </span>
               <span className="rg-kpi__sub">48% of total inventory</span>
             </div>
             <div className="rg-kpi">
               <span className="rg-kpi__label">Disposal</span>
               <span className="rg-kpi__value" style={{ color: "var(--rg-danger)" }}>
-                38
+                {disposalCount}
               </span>
               <span className="rg-kpi__sub">Hazardous or beyond repair</span>
             </div>

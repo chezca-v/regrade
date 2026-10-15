@@ -11,9 +11,9 @@ const base = {
   strokeLinejoin: "round" as const,
 };
 
-export function CheckIcon() {
+export function CheckIcon({ size = 16 }: { size?: number } = {}) {
   return (
-    <svg {...base} strokeWidth={2.2} aria-hidden="true">
+    <svg {...base} width={size} height={size} strokeWidth={2.2} aria-hidden="true">
       <path d="M5 12.5l4.5 4.5L19 7.5" />
     </svg>
   );

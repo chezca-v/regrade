@@ -4,7 +4,7 @@ import "./globals.css";
 import React, { useState } from "react";
 import { TopNav } from "./components/TopNav";
 import { Pill } from "./components/Pill";
-import { CheckIcon, ClockIcon, WarnIcon } from "./components/Icons";
+import { CheckIcon, WarnIcon } from "./components/Icons";
 
 export interface BinStatus {
   id: "Bin A" | "Bin B" | "Bin C";

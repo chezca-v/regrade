@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { TopNav } from "@/app/components/TopNav";
 import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/database.types";
 

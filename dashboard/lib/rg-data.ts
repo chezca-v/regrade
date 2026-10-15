@@ -9,6 +9,7 @@ import type {
   QueueDevice,
   GradingRule,
   Stage,
+  Reading,
 } from "./rg-types";
 
 // ---------------------------------------------------------------------------

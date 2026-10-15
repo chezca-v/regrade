@@ -1,7 +1,7 @@
 // ---------------------------------------------------------------------------
 // ReGrade – pure helpers (no React, no side-effects)
 // ---------------------------------------------------------------------------
-import type { Device, DiagnosticResult, ProcessingDecision, Reading, ReadingTone } from "./rg-types";
+import type { Device, DiagnosticResult, ProcessingDecision, ReadingTone } from "./rg-types";
 
 // ---------------------------------------------------------------------------
 // Formatters

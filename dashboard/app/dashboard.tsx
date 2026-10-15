@@ -127,6 +127,7 @@ export function DashboardPage() {
   }
 
   function handleOverrideConfirm(_reason: string) {
+    void _reason;
     setOverrideDevice(null);
     setDevices((prev) =>
       prev.map((d) =>

@@ -14,10 +14,11 @@ function ChevronDownIcon() {
       height="14"
       viewBox="0 0 24 24"
       fill="none"
-      stroke="#6b7280"
+      stroke="currentColor"
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
+      aria-hidden="true"
     >
       <polyline points="6 9 12 15 18 9" />
     </svg>
@@ -31,10 +32,11 @@ function SearchIcon() {
       height="15"
       viewBox="0 0 24 24"
       fill="none"
-      stroke="#9ca7a0"
+      stroke="currentColor"
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
+      aria-hidden="true"
     >
       <circle cx="11" cy="11" r="8" />
       <line x1="21" y1="21" x2="16.65" y2="16.65" />
@@ -45,6 +47,8 @@ function SearchIcon() {
 export default function ReferenceWeightsClient({ initialModels }: Props) {
   const [selectedBrand, setSelectedBrand] = useState("All brands");
   const [searchQuery, setSearchQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 12;
 
   // Extract unique brands for dropdown
   const brands = useMemo(() => {
@@ -73,29 +77,38 @@ export default function ReferenceWeightsClient({ initialModels }: Props) {
     });
   }, [initialModels, selectedBrand, searchQuery]);
 
+  const totalPages = Math.max(1, Math.ceil(filteredModels.length / pageSize));
+  const activePage = Math.min(currentPage, totalPages);
+  const startIdx = (activePage - 1) * pageSize;
+  const endIdx = startIdx + pageSize;
+  const paginatedModels = filteredModels.slice(startIdx, endIdx);
+
   return (
     <section
       aria-label="Smartphone Models Reference Weights"
-      className="bg-white rounded-2xl border border-[#e5ebe7] shadow-[0_2px_8px_rgba(0,0,0,0.02)] mt-6 p-6 overflow-hidden"
+      className="rg-card rg-card--pad"
     >
       {/* Title & Subtitle */}
-      <div>
-        <h2 className="text-[17px] font-extrabold text-[#15271f] tracking-tight">
-          Smartphone models
-        </h2>
-        <p className="text-[12px] text-[#718077] mt-0.5">
+      <div className="rg-card-head">
+        <h3>Smartphone models</h3>
+        <p className="rg-sub">
           Placeholder models and weights for design review.
         </p>
       </div>
 
       {/* Controls Toolbar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mt-5 mb-5">
+      <div className="rg-toolbar">
         {/* Left: Brand Dropdown */}
-        <div className="relative">
+        <div className="rg-select-wrap" style={{ minWidth: 150 }}>
           <select
             value={selectedBrand}
-            onChange={(e) => setSelectedBrand(e.target.value)}
-            className="appearance-none bg-white border border-[#dce2de] hover:border-[#c5cdc7] text-[#34443b] text-[12px] font-medium pl-3 pr-8 py-2 rounded-lg shadow-[0_1px_2px_rgba(0,0,0,0.02)] cursor-pointer outline-none transition-colors"
+            onChange={(e) => {
+              setSelectedBrand(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="rg-select"
+            style={{ padding: "8px 32px 8px 12px", fontSize: "12.5px" }}
+            aria-label="Filter by brand"
           >
             {brands.map((b) => (
               <option key={b} value={b}>
@@ -103,81 +116,77 @@ export default function ReferenceWeightsClient({ initialModels }: Props) {
               </option>
             ))}
           </select>
-          <div className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-[#75847c]">
+          <span className="rg-select-chevron" style={{ right: 10 }}>
             <ChevronDownIcon />
-          </div>
+          </span>
         </div>
 
         {/* Right: Search Input */}
-        <div className="relative flex items-center">
-          <div className="absolute left-3 pointer-events-none text-[#8e9c94]">
-            <SearchIcon />
-          </div>
+        <div className="rg-search">
+          <SearchIcon />
           <input
             type="text"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setCurrentPage(1);
+            }}
             placeholder="Search model name"
-            className="w-56 md:w-64 bg-white border border-[#dce2de] focus:border-[#246e4c] text-[#15271f] placeholder:text-[#93a199] text-[12px] pl-8 pr-3 py-2 rounded-lg shadow-[0_1px_2px_rgba(0,0,0,0.02)] outline-none transition-colors"
+            aria-label="Search model name"
+            style={{ width: 200 }}
           />
         </div>
       </div>
 
       {/* Table */}
-      <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse min-w-[960px]">
+      <div className="rg-table-container">
+        <table className="rg-data-table">
           <thead>
-            <tr className="border-b border-[#f0f3f1] text-[11px] font-semibold text-[#839189]">
-              <th className="py-3 px-4 font-semibold">Model</th>
-              <th className="py-3 px-4 font-semibold">Brand</th>
-              <th className="py-3 px-4 font-semibold">Nominal weight</th>
-              <th className="py-3 px-4 font-semibold">Accepted range (±5%)</th>
-              <th className="py-3 px-4 font-semibold">Recycle below (−15%)</th>
-              <th className="py-3 px-4 font-semibold">Last updated</th>
+            <tr>
+              <th>Model</th>
+              <th>Brand</th>
+              <th>Nominal weight</th>
+              <th>Accepted range (±5%)</th>
+              <th>Recycle below (−15%)</th>
+              <th>Last updated</th>
             </tr>
           </thead>
           <tbody>
-            {filteredModels.length === 0 ? (
+            {paginatedModels.length === 0 ? (
               <tr>
-                <td colSpan={6} className="py-12 text-center text-[#8e9c94] text-[13px]">
+                <td
+                  colSpan={6}
+                  style={{
+                    padding: "48px 16px",
+                    textAlign: "center",
+                    color: "var(--rg-muted)",
+                  }}
+                >
                   No models match your current filters.
                 </td>
               </tr>
             ) : (
-              filteredModels.map((item) => (
-                <tr
-                  key={item.id}
-                  className="border-b border-[#f1f4f2] text-[12px] text-[#3e4f45] hover:bg-[#f9faf9] transition-colors"
-                >
+              paginatedModels.map((item) => (
+                <tr key={item.id}>
                   {/* Model */}
-                  <td className="py-3.5 px-4 font-bold text-[#15271f] whitespace-nowrap">
+                  <td style={{ fontWeight: 700, color: "var(--rg-ink)" }}>
                     {item.model}
                   </td>
 
                   {/* Brand */}
-                  <td className="py-3.5 px-4 whitespace-nowrap text-[#495a50]">
-                    {item.brand}
-                  </td>
+                  <td>{item.brand}</td>
 
                   {/* Nominal weight */}
-                  <td className="py-3.5 px-4 whitespace-nowrap text-[#495a50]">
-                    {item.nominalWeightG} g
-                  </td>
+                  <td>{item.nominalWeightG} g</td>
 
                   {/* Accepted range */}
-                  <td className="py-3.5 px-4 whitespace-nowrap text-[#495a50]">
-                    {item.acceptedRange}
-                  </td>
+                  <td>{item.acceptedRange}</td>
 
                   {/* Recycle below */}
-                  <td className="py-3.5 px-4 whitespace-nowrap text-[#495a50]">
-                    {item.recycleBelow}
-                  </td>
+                  <td>{item.recycleBelow}</td>
 
                   {/* Last updated */}
-                  <td className="py-3.5 px-4 whitespace-nowrap text-[#495a50]">
-                    {item.lastUpdated}
-                  </td>
+                  <td>{item.lastUpdated}</td>
                 </tr>
               ))
             )}
@@ -186,20 +195,33 @@ export default function ReferenceWeightsClient({ initialModels }: Props) {
       </div>
 
       {/* Footer Pagination */}
-      <div className="py-4 mt-2 flex items-center justify-between border-t border-[#f0f3f1] text-[12px] text-[#718077]">
-        <div>
-          Showing 1 to {Math.min(filteredModels.length, 12)} of {initialModels.length > 12 ? initialModels.length : 86} sample models
+      <div className="rg-pagination">
+        <div className="rg-pagination-info">
+          Showing {filteredModels.length === 0 ? 0 : startIdx + 1} to{" "}
+          {Math.min(endIdx, filteredModels.length)} of {filteredModels.length} sample models
         </div>
-        <div className="flex items-center gap-2">
+        <div className="rg-pagination-actions">
           <button
             type="button"
-            className="px-3 py-1.5 bg-white border border-[#d9e0db] hover:bg-[#f9faf9] text-[#2c3d34] font-semibold text-[12px] rounded-lg shadow-[0_1px_2px_rgba(0,0,0,0.02)] transition-colors cursor-pointer"
+            className="rg-btn"
+            disabled={activePage <= 1}
+            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            style={{
+              opacity: activePage <= 1 ? 0.45 : 1,
+              cursor: activePage <= 1 ? "not-allowed" : "pointer",
+            }}
           >
             Previous
           </button>
           <button
             type="button"
-            className="px-3 py-1.5 bg-white border border-[#d9e0db] hover:bg-[#f9faf9] text-[#2c3d34] font-semibold text-[12px] rounded-lg shadow-[0_1px_2px_rgba(0,0,0,0.02)] transition-colors cursor-pointer"
+            className="rg-btn"
+            disabled={activePage >= totalPages}
+            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+            style={{
+              opacity: activePage >= totalPages ? 0.45 : 1,
+              cursor: activePage >= totalPages ? "not-allowed" : "pointer",
+            }}
           >
             Next
           </button>
