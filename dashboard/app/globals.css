@@ -1523,13 +1523,163 @@ a {
 }
 
 /* --------------------------------------------------------------------------
+   Sorting & Bins Page Styles
+   -------------------------------------------------------------------------- */
+.rg-bins-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+.rg-bin-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  position: relative;
+  overflow: hidden;
+}
+
+.rg-bin-card--green {
+  border-top: 4px solid var(--rg-safe);
+}
+
+.rg-bin-card--blue {
+  border-top: 4px solid var(--rg-recycle);
+}
+
+.rg-bin-card--red {
+  border-top: 4px solid var(--rg-danger);
+}
+
+.rg-bin-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.rg-bin-title {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rg-bin-title h3 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--rg-ink);
+}
+
+.rg-bin-capacity {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--rg-ink);
+  line-height: 1;
+}
+
+.rg-bin-capacity small {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--rg-muted);
+}
+
+.rg-bin-progress-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rg-bin-progress-bar {
+  height: 8px;
+  background-color: var(--rg-line-soft);
+  border-radius: var(--rg-radius-full);
+  overflow: hidden;
+}
+
+.rg-bin-progress-fill {
+  height: 100%;
+  border-radius: var(--rg-radius-full);
+  transition: width 0.4s ease;
+}
+
+.rg-bin-progress-fill--green {
+  background-color: var(--rg-safe);
+}
+
+.rg-bin-progress-fill--blue {
+  background-color: var(--rg-recycle);
+}
+
+.rg-bin-progress-fill--red {
+  background-color: var(--rg-danger);
+}
+
+.rg-bin-meta-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  background-color: #f7faf8;
+  border: 1px solid #e7ede9;
+  border-radius: var(--rg-radius-md);
+  padding: 12px 14px;
+}
+
+.rg-bin-meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.rg-bin-meta-label {
+  font-size: 10.5px;
+  color: var(--rg-muted);
+}
+
+.rg-bin-meta-val {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--rg-ink);
+}
+
+.rg-bin-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.rg-bin-actions .rg-btn {
+  flex: 1;
+}
+
+/* --------------------------------------------------------------------------
+   Inventory Page Styles
+   -------------------------------------------------------------------------- */
+.rg-inv-badge-hazard {
+  background-color: #fff1ee;
+  color: #c44128;
+  font-weight: 700;
+}
+
+.rg-table-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-top: 1px solid var(--rg-line-soft);
+  font-size: 12px;
+  color: var(--rg-muted);
+}
+
+/* --------------------------------------------------------------------------
    Responsive Layout Breakpoints
    -------------------------------------------------------------------------- */
 @media (max-width: 1100px) {
   .rg-mid-grid,
   .rg-diag-split,
   .rg-alerts-split,
-  .rg-reports-split {
+  .rg-reports-split,
+  .rg-bins-grid {
     grid-template-columns: 1fr;
   }
   .rg-kpi-grid {
