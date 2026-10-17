@@ -5,8 +5,8 @@
 namespace config {
 constexpr uint8_t I2C_SDA_PIN = 21;
 constexpr uint8_t I2C_SCL_PIN = 22;
-constexpr uint8_t HX711_DOUT_PIN = 32;
-constexpr uint8_t HX711_SCK_PIN = 33;
+constexpr uint8_t HX711_DOUT_PIN = 16;
+constexpr uint8_t HX711_SCK_PIN = 17;
 constexpr uint8_t START_BUTTON_PIN = 27;
 constexpr uint8_t SERVO_PIN = 18;
 constexpr uint8_t LCD_I2C_ADDRESS = 0x27;
