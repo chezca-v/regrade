@@ -8,7 +8,7 @@ constexpr uint8_t I2C_SCL_PIN = 22;
 constexpr uint8_t HX711_DOUT_PIN = 16;
 constexpr uint8_t HX711_SCK_PIN = 17;
 // Set after calibrating the assembled station; zero keeps a value unavailable.
-constexpr float HX711_COUNTS_PER_GRAM = 0.0F;
+constexpr float HX711_COUNTS_PER_GRAM =-36.9688F;
 // Measured empty-bed VL53L0X reading: averaged ~251.2mm across repeated
 // samples, cross-checked against a ruler (~250mm) and confirmed repeatable
 // across a power cycle. Re-measure and update if the sensor is re-mounted.
