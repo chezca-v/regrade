@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="path/to/your/logo.png" alt="ReGrade logo" width="120"/>
+  <img src="docs/assets/logo.png" alt="ReGrade logo" width="160"/>
 </div>
 
 <h1 align="center">ReGrade</h1>

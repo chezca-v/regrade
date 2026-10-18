@@ -1,6 +1,8 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   createClient,
@@ -44,10 +46,18 @@ export default function LoginPage() {
   return (
     <main className="auth-shell">
       <section className="auth-card">
-        <a className="brand-lockup auth-brand" href="/" aria-label="ReGrade home">
-          <span className="brand-mark">R</span>
-          <span><strong>regrade</strong><small>TRIAGE PLATFORM</small></span>
-        </a>
+        <Link className="auth-brand" href="/overview" aria-label="ReGrade home">
+          <div className="auth-brand__mark">
+            <Image
+              src="/logo.png"
+              alt="ReGrade logo"
+              width={72}
+              height={72}
+              className="auth-brand__img"
+              priority
+            />
+          </div>
+        </Link>
         <h1>Welcome back</h1>
         <p className="auth-description">Sign in to your ReGrade workspace.</p>
 

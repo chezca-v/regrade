@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/database.types";
 
@@ -13,20 +14,25 @@ function BrandMarkIcon() {
       style={{
         width: 36,
         height: 36,
-        borderRadius: 10,
-        backgroundColor: "#163d2d",
+        borderRadius: 9,
+        backgroundColor: "#ffffff",
+        border: "1px solid #dde5e0",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
+        overflow: "hidden",
         flexShrink: 0,
+        boxShadow: "0 1px 3px rgba(22, 45, 33, 0.08)",
       }}
     >
-      <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-        <rect x="2" y="2" width="6" height="6" rx="1.5" fill="white" />
-        <rect x="10" y="2" width="6" height="6" rx="1.5" fill="white" />
-        <rect x="2" y="10" width="6" height="6" rx="1.5" fill="white" />
-        <rect x="10" y="10" width="6" height="6" rx="1.5" fill="white" />
-      </svg>
+      <Image
+        src="/logo.png"
+        alt="ReGrade logo"
+        width={36}
+        height={36}
+        style={{ width: "100%", height: "100%", objectFit: "contain" }}
+        priority
+      />
     </div>
   );
 }
@@ -385,7 +391,7 @@ export default async function DeviceDetailPage({ params }: PageProps) {
       <header className="w-full bg-[#f3f5f3] pt-4 px-6 md:px-10 max-w-[1440px] mx-auto">
         <div className="flex items-center justify-between gap-4">
           {/* Logo & Subtitle */}
-          <div className="flex items-center gap-3">
+          <Link href="/overview" className="flex items-center gap-3 no-underline">
             <BrandMarkIcon />
             <div>
               <div className="font-extrabold text-[17px] text-[#15271f] tracking-tight leading-none">
@@ -395,7 +401,7 @@ export default async function DeviceDetailPage({ params }: PageProps) {
                 E-waste diagnostics
               </div>
             </div>
-          </div>
+          </Link>
 
           {/* Center Links (Pill Container) */}
           <nav className="hidden lg:flex items-center bg-white rounded-full px-2 py-1 shadow-[0_1px_4px_rgba(0,0,0,0.04)] border border-[#e8ece9]">

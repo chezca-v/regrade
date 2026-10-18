@@ -5,6 +5,11 @@ export const metadata: Metadata = {
   title: "ReGrade | Triage dashboard",
   description:
     "Monitor e-waste diagnostics and inventory from ReGrade test stations.",
+  icons: {
+    icon: "/logo.png",
+    shortcut: "/logo.png",
+    apple: "/logo.png",
+  },
 };
 
 export default function RootLayout({

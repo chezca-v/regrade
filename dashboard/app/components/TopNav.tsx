@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -32,12 +33,14 @@ export function TopNav({ alertCount = 2 }: TopNavProps) {
         {/* Brand */}
         <Link href="/overview" className="rg-brand" aria-label="ReGrade home">
           <span className="rg-brand__mark">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" aria-hidden="true">
-              <rect x="4" y="4" width="6" height="6" rx="1" />
-              <rect x="14" y="4" width="6" height="6" rx="1" />
-              <rect x="4" y="14" width="6" height="6" rx="1" />
-              <rect x="14" y="14" width="6" height="6" rx="1" />
-            </svg>
+            <Image
+              src="/logo.png"
+              alt="ReGrade logo"
+              width={34}
+              height={34}
+              className="rg-brand__logo-img"
+              priority
+            />
           </span>
           <span className="rg-brand__name">
             ReGrade
