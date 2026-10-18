@@ -21,9 +21,9 @@ the test; batteries are never manually removed.
 [Live Demo](#live-demo) · [System Architecture](#system-architecture) · [Security & Privacy](#security--privacy) · [MIT License](LICENSE)
 
 > **Prototype safety notice:** This repository is an initial software
-> scaffold. Sensor acquisition, calibrated thresholds, and servo actuation
-> remain disabled stubs. Do not connect or energize a device under test, or use
-> this system to make real safety or disposal decisions, until the circuit,
+> prototype. Sensor acquisition requires station-specific calibration values.
+> Grading thresholds and servo actuation remain disabled. Do not use this
+> system to make real safety or disposal decisions until the circuit,
 > calibration process, and test procedure have been reviewed and validated.
 
 ## 📌 Product Overview
@@ -64,35 +64,35 @@ The dashboard is now implemented as a starter, but no genuine screenshots have
 been captured for the project yet. Add reviewed dashboard and test-station
 screenshots here as the prototype is built and tested.
 
-| Dashboard / Inventory | ReGrade Test Station |
-| --- | --- |
-| *Dashboard screenshot coming soon* | *Test-station screenshot coming soon* |
+| Dashboard / Inventory              | ReGrade Test Station                  |
+| ---------------------------------- | ------------------------------------- |
+| _Dashboard screenshot coming soon_ | _Test-station screenshot coming soon_ |
 
-| Diagnostic Cycle |
-| --- |
-| *Walkthrough GIF coming soon* |
+| Diagnostic Cycle              |
+| ----------------------------- |
+| _Walkthrough GIF coming soon_ |
 
 ---
 
 ## 🛠️ Tech Stack
 
-| # | Tool / Technology | Category | Description |
-|---|---|---|---|
-| 1 | ESP32-WROOM-32D DevKit V1 | Compute & Control | Runs the station firmware and manages sensor, UI, actuator, Wi-Fi, and MQTT interactions. |
-| 2 | PlatformIO / Arduino framework | Firmware | Builds and uploads the embedded C/C++ firmware. |
-| 3 | HX711 + 1 kg bar load cell | Physical Sensing | Reads device weight for comparison with a model baseline. |
-| 4 | VL53L0X time-of-flight sensor | Physical Sensing | Measures distance from a fixed arch to estimate device thickness and detect casing deformation. |
-| 5 | MLX90614 (GY-906 BCC) | Physical Sensing | Reads surface temperature without contact. |
-| 6 | INA219 current/voltage sensor | Electrical Diagnostics | Measures USB input current and voltage through a reviewed, protected test fixture. |
-| 7 | IRFZ44N MOSFET, 1N4007 diode, LM7805 buck converter, PTC fuse, power resistor | Analog & Power Protection | Planned switching, regulation, and protection components; circuit design requires review before use. |
-| 8 | LM358 / TL072 active Sallen-Key low-pass filter | Analog Front-End | Planned signal conditioning for the analog front-end. |
-| 9 | 16×2 LCD with I2C backpack | Actuation & UI | Displays operator prompts and diagnostic status. |
-| 10 | MG996R servo, tactile buttons, tri-color LEDs, buzzer | Actuation & UI | Planned diverter and operator/status controls. |
-| 11 | MQTT / PubSubClient | Cloud / IoT | Transports JSON diagnostics to a HiveMQ or Mosquitto broker. |
-| 12 | Python / Paho MQTT | Cloud / Backend | Receives and logs diagnostic JSON messages. |
-| 13 | Supabase PostgreSQL / NestJS | Database & Planned API | Versioned schema and authenticated dashboard reads are prepared; MQTT ingestion API is not implemented. |
-| 14 | Next.js / React | Web Dashboard | Authenticated, read-only inventory and station dashboard connected to Supabase when configured. |
-| 15 | Node-RED / Blynk | Optional Dashboard | Alternative dashboard tooling for future IoT monitoring workflows. |
+| #   | Tool / Technology                                                             | Category                  | Description                                                                                          |
+| --- | ----------------------------------------------------------------------------- | ------------------------- | ---------------------------------------------------------------------------------------------------- |
+| 1   | ESP32-WROOM-32D DevKit V1                                                     | Compute & Control         | Runs the station firmware and manages sensor, UI, actuator, Wi-Fi, and MQTT interactions.            |
+| 2   | PlatformIO / Arduino framework                                                | Firmware                  | Builds and uploads the embedded C/C++ firmware.                                                      |
+| 3   | HX711 + 1 kg bar load cell                                                    | Physical Sensing          | Reads device weight for comparison with a model baseline.                                            |
+| 4   | VL53L0X time-of-flight sensor                                                 | Physical Sensing          | Measures distance from a fixed arch to estimate device thickness and detect casing deformation.      |
+| 5   | MLX90614 (GY-906 BCC)                                                         | Physical Sensing          | Reads surface temperature without contact.                                                           |
+| 6   | INA219 current/voltage sensor                                                 | Electrical Diagnostics    | Measures USB input current and voltage through a reviewed, protected test fixture.                   |
+| 7   | IRFZ44N MOSFET, 1N4007 diode, LM7805 buck converter, PTC fuse, power resistor | Analog & Power Protection | Planned switching, regulation, and protection components; circuit design requires review before use. |
+| 8   | LM358 / TL072 active Sallen-Key low-pass filter                               | Analog Front-End          | Planned signal conditioning for the analog front-end.                                                |
+| 9   | 16×2 LCD with I2C backpack                                                    | Actuation & UI            | Displays operator prompts and diagnostic status.                                                     |
+| 10  | MG996R servo, tactile buttons, tri-color LEDs, buzzer                         | Actuation & UI            | Planned diverter and operator/status controls.                                                       |
+| 11  | MQTT / PubSubClient                                                           | Cloud / IoT               | Transports JSON diagnostics to a HiveMQ or Mosquitto broker.                                         |
+| 12  | Python / Paho MQTT                                                            | Cloud / Backend           | Receives, validates, logs, and persists diagnostic telemetry.                                        |
+| 13  | Supabase PostgreSQL                                                           | Database                  | Stores station telemetry with public read-only access under RLS.                                     |
+| 14  | Next.js / React                                                               | Web Dashboard             | Open station readings dashboard connected to Supabase when configured.                               |
+| 15  | Node-RED / Blynk                                                              | Optional Dashboard        | Alternative dashboard tooling for future IoT monitoring workflows.                                   |
 
 ---
 
@@ -113,9 +113,8 @@ flowchart LR
     ESP --> Servo[MG996R diverter]
     ESP -->|MQTT over TLS| Broker[HiveMQ or Mosquitto]
     Broker --> Listener[Python MQTT listener]
-    Listener -. planned ingestion integration .-> API[NestJS backend]
-    API -. planned persistence .-> DB[(PostgreSQL / Supabase)]
-    Dashboard[Next.js web dashboard] -->|Supabase Auth + RLS| DB
+    Listener -->|server-only key| DB[(PostgreSQL / Supabase)]
+    Dashboard[Next.js web dashboard] -->|publishable key + public telemetry policy| DB
 ```
 
 The firmware follows an `IDLE → SCAN → GRADE → SORT → REPORT` state sequence.
@@ -126,17 +125,15 @@ set before grading or sorting is enabled. See
 
 ### Database status
 
-**Supabase is not connected until you create a project and add its credentials.**
-The versioned PostgreSQL migration is in
-[supabase/migrations/](supabase/migrations/); it has not been applied to your
-project. The dashboard now expects authenticated Supabase reads and no longer
-uses sample records. The MQTT listener still only logs messages; ingestion into
-Supabase remains future work.
+The versioned PostgreSQL migrations are in
+[supabase/migrations/](supabase/migrations/); apply them to your project. The
+dashboard reads station telemetry without sign-in under a public, read-only
+RLS policy. The MQTT listener upserts reports into `station_telemetry` when
+configured with server-only Supabase credentials.
 
-The initial migration enables Row Level Security and allows authenticated
-operators to read the shared project inventory. The dashboard cannot write
-records yet. It deliberately does not use a Supabase service-role key. Review
-these access policies before storing real or sensitive data.
+Row Level Security remains enabled. Anyone can read station telemetry for the
+open dashboard; ingestion still requires the server-only key held by the MQTT
+listener. Do not include personal or confidential data in public telemetry.
 
 ---
 
@@ -185,8 +182,8 @@ npm run dev
 ```
 
 Create `dashboard/.env.local` using the steps below before starting the server.
-Then open [http://localhost:3000/login](http://localhost:3000/login), sign in
-with an operator account created in Supabase Auth, and view the dashboard.
+Then open [http://localhost:3000/diagnostics](http://localhost:3000/diagnostics)
+to view station readings without signing in.
 Stop the development server with `Ctrl+C` in its terminal.
 
 ### Connect a new Supabase project
@@ -208,11 +205,12 @@ Stop the development server with `Ctrl+C` in its terminal.
    The project reference is in the Supabase project URL. Review
    [the migration](supabase/migrations/20261012230000_initial_regrade_schema.sql)
    before applying it.
-4. In Supabase **Authentication → Users**, create/invite an email-and-password
+
+4. Optional for other operator features: in Supabase **Authentication → Users**, create/invite an email-and-password
    user for each dashboard operator. The migration creates a matching operator
    profile automatically when an Auth user is created.
 5. In the Supabase project **Connect** dialog, copy the project URL and
-publishable key. In `dashboard/`, create local environment settings:
+   publishable key. In `dashboard/`, create local environment settings:
 
    ```sh
    cd dashboard
@@ -222,13 +220,14 @@ publishable key. In `dashboard/`, create local environment settings:
    Edit `dashboard/.env.local` and set
    `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
    Then follow **Run the web dashboard**.
-6. The dashboard will show live station, grading-rule, and diagnostic data.
-   The page will be empty until corresponding records exist in the database.
+
+6. Open `/diagnostics` to view public station telemetry. It will be empty until
+   the listener saves reports to Supabase.
 
 Only the publishable key belongs in the dashboard environment. Never expose a
 Supabase secret/service-role key through a `NEXT_PUBLIC_` variable or browser
-code. The MQTT listener is not yet connected to Supabase, so records must
-currently be inserted by a separately reviewed backend or controlled setup.
+code. Configure `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` only on the
+server running the MQTT listener.
 
 ### Clone and configure
 
@@ -245,21 +244,43 @@ currently be inserted by a separately reviewed backend or controlled setup.
    cp firmware/include/secrets.example.h firmware/include/secrets.h
    ```
 
-   Set the Wi-Fi and MQTT values in `firmware/include/secrets.h`, including a
-   trusted broker CA certificate. Review pin assignments and wiring in
-   `firmware/include/regrade_config.h` and `circuit/`.
+   Set the Wi-Fi and MQTT values in `firmware/include/secrets.h`. For the local
+   Docker broker, set `MQTT_HOST` to the computer's LAN IPv4 address,
+   `MQTT_PORT` to `1883`, and `MQTT_TLS_ENABLED` to `0`; keep the ESP32 and
+   broker on the same trusted network. For remote brokers, use TLS and its CA
+   certificate. Calibrate HX711 and empty-bed VL53L0X values in
+   `firmware/include/regrade_config.h`. Review wiring in `circuit/`.
+
+   For HX711 calibration, run:
+
+   ```sh
+   pio run -e esp32dev_hx711_calibrate_test --target upload
+   ```
+
+   Open the 115200-baud serial monitor, keep the platform empty for tare, then
+   place a known mass and enter its grams. Copy the reported counts-per-gram
+   value into `HX711_COUNTS_PER_GRAM`. For the ToF reference, run:
+
+   ```sh
+   pio run -e esp32dev_all_sensors_test --target upload
+   ```
+
+   Keep the bed empty and copy its distance in mm into
+   `TOF_EMPTY_BED_DISTANCE_MM`. Rebuild the main `esp32dev` target after
+   setting both values. Do not connect a device for current measurement until
+   the protected USB fixture has been reviewed.
 
 3. Build the firmware:
 
    ```sh
    cd firmware
-   pio run
+   pio run -e esp32dev
    ```
 
    Upload only after confirming the wiring and safety review:
 
    ```sh
-   pio run --target upload
+   pio run -e esp32dev --target upload
    ```
 
 4. Set up and run the MQTT listener from the repository root:
@@ -272,26 +293,34 @@ currently be inserted by a separately reviewed backend or controlled setup.
    python -m pip install -r cloud/requirements.txt
    ```
 
-   Configure the listener using environment variables:
+   Configure the listener. For the local Docker broker, in PowerShell set:
 
    ```text
-   MQTT_HOST=localhost
-   MQTT_PORT=1883
-   MQTT_TOPIC=regrade/+/diagnostics
-   MQTT_TLS=false
+   $env:MQTT_HOST = "localhost"
+   $env:MQTT_PORT = "1883"
+   $env:MQTT_TOPIC = "regrade/+/diagnostics"
+   $env:MQTT_TLS = "false"
+   $env:SUPABASE_URL = "https://your-project-ref.supabase.co"
+   $env:SUPABASE_SERVICE_ROLE_KEY = "your-server-only-key"
    ```
 
-   For a hosted TLS broker, set `MQTT_TLS=true`, `MQTT_CA_CERT` to the trusted
-   CA certificate path, and provide `MQTT_USERNAME` / `MQTT_PASSWORD` as
-   appropriate. Do not put secrets in shell history or commit them to the repo.
-   Then run:
+   Keep the Supabase secret key only in this listener process environment; do
+   not put it in the dashboard or Vercel browser variables. For a hosted TLS
+   broker, set `MQTT_TLS=true`, `MQTT_CA_CERT` to the trusted CA certificate
+   path, and provide `MQTT_USERNAME` / `MQTT_PASSWORD` as appropriate. Then run:
 
    ```sh
    python cloud/mqtt-listener.py
    ```
 
-The listener logs received JSON payloads to standard output; it does not yet
-persist data to PostgreSQL/Supabase or populate the dashboard.
+The listener logs received JSON payloads and upserts them to
+`station_telemetry`. Apply the new migration before starting it. Configure
+`NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` with the
+same Supabase project in both `dashboard/.env.local` and the Vercel project
+environment. The Vercel site reads the same records from Supabase without
+sign-in; the MQTT listener must remain running and connected to the broker for
+new reports to arrive. The dashboard diagnostics route refreshes its report
+list on page load.
 
 ---
 
@@ -333,7 +362,7 @@ regrade/
 ├── .github/                   # GitHub templates and CI configuration
 ├── cad/                       # Mechanical design files and notes
 ├── circuit/                   # Schematics, wiring, and electrical safety notes
-├── cloud/                     # MQTT listener and broker message logging
+├── cloud/                     # MQTT listener and Supabase telemetry ingestion
 ├── dashboard/                 # Next.js App Router dashboard starter
 │   ├── app/                   # Pages, layout, and responsive styles
 │   ├── lib/supabase/          # Browser and server Supabase clients
@@ -377,9 +406,9 @@ Distributed under the MIT License. See [LICENSE](LICENSE) for details.
 
 ## 👩‍💻 Meet the Team
 
-| Team Member | Role |
-|---|---|
-| Cessa | Introduction, problem statement, and target scope |
-| Lena | Non-destructive hardware methodology |
+| Team Member | Role                                              |
+| ----------- | ------------------------------------------------- |
+| Cessa       | Introduction, problem statement, and target scope |
+| Lena        | Non-destructive hardware methodology              |
 
 <!-- Add team members and roles as the project team is finalized. -->

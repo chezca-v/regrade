@@ -14,7 +14,8 @@ calibration.
 ## Repository map
 
 - `firmware/`: ESP32 DevKit V1 firmware built with PlatformIO and Arduino.
-- `cloud/`: Python MQTT listener; currently validates and logs JSON only.
+- `cloud/`: Python MQTT listener; validates, logs, and upserts telemetry to
+  Supabase when server-only credentials are configured.
 - `dashboard/`: Next.js App Router dashboard with Supabase Auth and
   authenticated, read-only database access.
 - `supabase/migrations/`: canonical versioned PostgreSQL schema and policies.
@@ -35,9 +36,8 @@ calibration.
   `NEXT_PUBLIC_` variable. The dashboard uses the publishable key and Supabase
   Auth session with database RLS; preserve its read-only access model.
 - `supabase/migrations/` is the canonical database schema. Update generated or
-  handwritten TypeScript database types when schema changes require it. Do not
-  claim MQTT data is persisted: `cloud/mqtt-listener.py` is log-only and no
-  ingestion API is currently implemented.
+  handwritten TypeScript database types when schema changes require it. Keep
+  the listener's Supabase service key server-only; the dashboard uses RLS.
 - Keep firmware fail-closed. Missing or uncalibrated sensor values/rules must
   not produce a grade or sorter action. Do not add device charging/load
   stimulus or servo actuation before the electrical fixture, interlocks,

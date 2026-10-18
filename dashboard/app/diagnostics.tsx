@@ -16,6 +16,19 @@ import {
 import { RESULT_COLOR } from "@/lib/rg-helpers";
 import type { Stage, QueueDevice } from "@/lib/rg-types";
 
+type Telemetry = {
+  telemetry_id: number;
+  station_id: string;
+  session_id: string;
+  status: string;
+  duration_ms: number | null;
+  readings: import("@/lib/database.types").Json;
+  fault: string | null;
+  reported_at: string;
+};
+
+type DiagnosticsPageProps = { telemetry: Telemetry[]; telemetryError: boolean };
+
 function DeviceIcon() {
   return (
     <svg
@@ -35,7 +48,7 @@ function DeviceIcon() {
   );
 }
 
-export function DiagnosticsPage() {
+export function DiagnosticsPage({ telemetry, telemetryError }: DiagnosticsPageProps) {
   const router = useRouter();
   const [stages] = useState<Stage[]>(STAGES);
   const [queue] = useState<QueueDevice[]>(QUEUE);
@@ -46,6 +59,36 @@ export function DiagnosticsPage() {
       <TopNav />
       <main className="rg-main">
         <div className="rg-page">
+          <section className="rg-card rg-card--pad">
+            <h2>Latest station readings</h2>
+            <p className="rg-small rg-muted">Live MQTT reports saved in Supabase. This section refreshes when you reload the page.</p>
+            {telemetryError ? (
+              <p className="rg-small">Could not load station reports. Confirm the public telemetry migration is applied and the dashboard points to the same Supabase project.</p>
+            ) : telemetry.length === 0 ? (
+              <p className="rg-small">No station reports have arrived yet.</p>
+            ) : (
+              <div className="rg-table-wrap">
+                <table className="rg-rules-table">
+                  <thead><tr><th>Received</th><th>Station</th><th>Session</th><th>Status</th><th>Weight (g)</th><th>Thickness (mm)</th><th>Current (mA)</th><th>Surface temp (°C)</th><th>Temp rise (°C)</th></tr></thead>
+                  <tbody>
+                    {telemetry.map((record) => {
+                      const readings = record.readings && typeof record.readings === "object" && !Array.isArray(record.readings)
+                        ? record.readings as Record<string, import("@/lib/database.types").Json | undefined>
+                        : {};
+                      const display = (key: string) => {
+                        const value = readings[key];
+                        return typeof value === "number" ? value.toFixed(2) : "—";
+                      };
+                      return <tr key={record.telemetry_id}>
+                        <td>{new Date(record.reported_at).toISOString().replace("T", " ").slice(0, 19)} UTC</td><td>{record.station_id}</td><td>{record.session_id}</td><td>{record.status}</td>
+                        <td>{display("weight_g")}</td><td>{display("thickness_mm")}</td><td>{display("current_ma")}</td><td>{display("surface_temp_c")}</td><td>{display("temperature_rise_c")}</td>
+                      </tr>;
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
           {/* Title bar */}
           <div className="rg-titlebar">
             <div>

@@ -49,11 +49,16 @@ void setup() {
   Serial.println("ReGrade all-sensors test (read-only, no grading/servo)");
   i2c_diagnostics::beginWithDiagnostics();
 
-  // LCD first so it can show status as each module comes up.
-  lcd.init();
-  lcd.backlight();
-  lcdReady = true;
-  showLcdLines("ReGrade bench", "Initializing...");
+  // LCD first so it can show status as each module comes up. LiquidCrystal_I2C
+  // has no return value to confirm the LCD actually acknowledged, so probe
+  // its address directly rather than assuming success.
+  Wire.beginTransmission(config::LCD_I2C_ADDRESS);
+  lcdReady = (Wire.endTransmission() == 0);
+  if (lcdReady) {
+    lcd.init();
+    lcd.backlight();
+    showLcdLines("ReGrade bench", "Initializing...");
+  }
 
   loadCell.begin(config::HX711_DOUT_PIN, config::HX711_SCK_PIN);
   hx711Ready = loadCell.wait_ready_timeout(1000);
@@ -70,8 +75,8 @@ void setup() {
     currentSensor.setCalibration_32V_2A();
   }
 
-  Serial.printf("LCD        init=%s (addr=0x%02X)\n", "ok",
-                config::LCD_I2C_ADDRESS);
+  Serial.printf("LCD        init=%s (addr=0x%02X)\n",
+                lcdReady ? "ok" : "failed", config::LCD_I2C_ADDRESS);
   Serial.printf("HX711      init=%s (DOUT=%u, SCK=%u)\n",
                 hx711Ready ? "ok" : "failed",
                 static_cast<unsigned int>(config::HX711_DOUT_PIN),

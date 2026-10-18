@@ -17,19 +17,16 @@ flowchart LR
     USB --> ESP
     ESP --> LCD[16x2 I2C LCD]
     ESP --> Servo[MG996R diverter]
-    ESP -->|MQTT over TLS| Broker[HiveMQ or Mosquitto]
+    ESP -->|MQTT; TLS recommended| Broker[HiveMQ or Mosquitto]
     Broker --> Listener[Python MQTT listener]
-    Listener -. planned API integration .-> API[NestJS backend]
-    API -. planned persistence .-> DB[(PostgreSQL / Supabase)]
-    API -. planned data API .-> UI[Next.js dashboard]
-    UI -->|Supabase Auth + publishable key| DB
+    Listener -->|server-only key| DB[(PostgreSQL / Supabase)]
+    Dashboard[Next.js dashboard] -->|publishable key + public telemetry policy| DB
 ```
 
-The device model and its calibrated baseline must be identified before
-measurement interpretation. Firmware-side sensor acquisition, model
-identification, rule-set retrieval, and validated thresholds remain
-implementation work. A failed or incomplete reading produces telemetry and
-does not actuate the sorter.
+HX711 scale and ToF empty-bed distance values require station calibration.
+Device-model identification, approved grading-rule retrieval, and validated
+thresholds remain implementation work. A failed or incomplete reading
+produces partial telemetry and does not actuate the sorter.
 
 ## Components
 
@@ -42,9 +39,9 @@ does not actuate the sorter.
 | Electrical | INA219 and protected 5 V fixture | Input voltage/current measurement; fixture design is not enabled by this firmware |
 | UI/sorting | 16x2 I2C LCD, button, MG996R | Operator prompt and grade-bin diverter |
 | Messaging | MQTT over TLS | Diagnostic telemetry transport |
-| Logging | `cloud/mqtt-listener.py` | Validate JSON object shape and log received telemetry |
-| Dashboard | `dashboard/` (Next.js, TypeScript) | Authenticated read-only interface for Supabase; requires project configuration |
-| Persistence/API | NestJS and PostgreSQL/Supabase | Planned integration; not implemented by this scaffold |
+| Ingestion | `cloud/mqtt-listener.py` | Validate, log, and upsert telemetry using a server-only Supabase key |
+| Dashboard | `dashboard/` (Next.js, TypeScript) | Public read-only station telemetry view; requires project configuration |
+| Persistence | Supabase REST API | Stores telemetry in `station_telemetry` |
 
 The current UI design uses a 16x2 LCD with an I2C backpack. Confirm its I2C
 address and wiring on the assembled hardware. LM358/TL072 filter circuitry and
@@ -62,7 +59,8 @@ software substitutes for a properly isolated, current-limited fixture.
    the outcome on the LCD.
 
 The loop services Wi-Fi/MQTT and the button alongside the state machine. MQTT
-is configured for TLS using a broker CA certificate. Reports are currently
+uses TLS and a broker CA certificate by default; trusted local brokers can use
+plain MQTT when explicitly configured. Reports are currently
 best-effort; durable buffering and confirmed delivery have not been added.
 
 ## Telemetry
@@ -71,11 +69,12 @@ The firmware publishes JSON at `regrade/<station-id>/diagnostics`. Fields
 include `session_id`, `station_id`, `status`, `grade`, `health_score`,
 `duration_ms`, `sort_success`, `fault`, and a `readings` object. An unavailable
 measurement is serialized as `null`; consumers must not interpret null as a
-passing measurement. The cloud listener currently logs payloads only and does
-not mutate a database or issue commands to the ESP32. The dashboard queries
-the `dashboard_diagnostics` Supabase view using an authenticated session. It
-does not yet consume listener output or a backend API, so the MQTT listener
-must not be assumed to populate database records.
+passing measurement. The cloud listener upserts reports into
+`station_telemetry` when `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are
+configured. It does not issue commands to the ESP32. The dashboard reads only
+this telemetry table without sign-in under a public read-only RLS policy; local
+and Vercel deployments show the same reports when they use the same Supabase
+project. Listener writes still require the server-only key.
 
 The Supabase migration enables Row Level Security, grants authenticated users
 read-only access to operational data, and withholds device serial/IMEI values

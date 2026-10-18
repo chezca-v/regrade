@@ -109,6 +109,16 @@ export type Database = {
         message: string;
         created_at: string;
       }>;
+      station_telemetry: Table<{
+        telemetry_id: number;
+        station_id: string;
+        session_id: string;
+        status: string;
+        duration_ms: number | null;
+        readings: Json;
+        fault: string | null;
+        reported_at: string;
+      }>;
     };
     Views: {
       dashboard_diagnostics: {

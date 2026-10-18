@@ -5,10 +5,13 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import os
 import signal
 import ssl
 import sys
+import urllib.error
+import urllib.request
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +19,61 @@ import paho.mqtt.client as mqtt
 
 
 LOGGER = logging.getLogger("regrade.mqtt")
+
+
+def _persist_telemetry(topic: str, payload: dict[str, Any]) -> None:
+    """Upsert a validated station report using the server-only Supabase key."""
+    supabase_url = os.getenv("SUPABASE_URL", "").rstrip("/")
+    service_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+    if not supabase_url or not service_key:
+        LOGGER.info("Supabase persistence disabled: set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY")
+        return
+
+    readings = payload.get("readings")
+    station_id = payload.get("station_id")
+    session_id = payload.get("session_id")
+    if not isinstance(readings, dict) or not isinstance(station_id, str) or not station_id:
+        LOGGER.warning("Ignoring telemetry without station_id/readings on %s", topic)
+        return
+    if not isinstance(session_id, str) or not session_id:
+        LOGGER.warning("Ignoring telemetry without session_id on %s", topic)
+        return
+    for key, value in readings.items():
+        if value is not None and (
+            isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or not math.isfinite(value)
+        ):
+            LOGGER.warning("Ignoring telemetry with invalid reading %s", key)
+            return
+
+    row = {
+        "station_id": station_id,
+        "session_id": session_id,
+        "status": str(payload.get("status", "unknown"))[:80],
+        "duration_ms": payload.get("duration_ms") if isinstance(payload.get("duration_ms"), int) and not isinstance(payload.get("duration_ms"), bool) and payload.get("duration_ms") >= 0 else None,
+        "readings": readings,
+        "fault": payload.get("fault") if isinstance(payload.get("fault"), str) else None,
+    }
+    endpoint = f"{supabase_url}/rest/v1/station_telemetry?on_conflict=station_id%2Csession_id"
+    request = urllib.request.Request(
+        endpoint,
+        data=json.dumps(row, separators=(",", ":")).encode("utf-8"),
+        headers={
+            "apikey": service_key,
+            "Authorization": f"Bearer {service_key}",
+            "Content-Type": "application/json",
+            "Prefer": "resolution=merge-duplicates,return=minimal",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=10) as response:
+            if response.status >= 300:
+                raise RuntimeError(f"Supabase returned HTTP {response.status}")
+        LOGGER.info("Persisted telemetry station=%s session=%s", station_id, session_id)
+    except (OSError, urllib.error.URLError, RuntimeError) as error:
+        LOGGER.error("Failed to persist telemetry: %s", error)
 
 
 def _env_bool(name: str, default: bool) -> bool:
@@ -71,6 +129,7 @@ def _on_message(
         message.topic,
         json.dumps(payload, separators=(",", ":"), sort_keys=True),
     )
+    _persist_telemetry(message.topic, payload)
 
 
 def create_client() -> mqtt.Client:

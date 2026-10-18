@@ -5,15 +5,15 @@ guidance in [`../CLAUDE.md`](../CLAUDE.md) as well.
 
 ## Accuracy and scope
 
-- Distinguish current implementation from planned work. The ESP32 sensor reads,
-  calibrated grading thresholds, sorter actuation, MQTT persistence, and
-  backend API are not implemented unless code and validation demonstrate
-  otherwise.
+- Distinguish current implementation from planned work. Sensor acquisition
+  needs station calibration; grading thresholds and sorter actuation remain
+  unavailable. The MQTT listener can persist telemetry when configured.
 - Describe ReGrade as a non-destructive smartphone and 5 V USB charger triage
   prototype. Do not imply that its external measurements diagnose battery
   cells or establish that a device is safe.
-- State that the MQTT listener logs telemetry only and that the dashboard
-  reads Supabase directly using authenticated, read-only access and RLS.
+- State that the MQTT listener logs and persists telemetry using a server-only
+  Supabase key, while public dashboard reads are limited to station telemetry
+  by RLS.
 - Treat `supabase/migrations/` as the canonical schema. Keep the ERD,
   architecture, and README aligned when entities, relationships, access
   policies, or data flows change.
