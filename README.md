@@ -157,6 +157,11 @@ listener. Do not include personal or confidential data in public telemetry.
 
 ## ⚙️ Getting Started & Local Setup
 
+For the complete, step-by-step setup from a fresh clone through sensor
+calibration, MQTT ingestion, Supabase, local dashboard, and Vercel deployment,
+follow the **[ReGrade setup guide](docs/SETUP_GUIDE.md)**. It includes the
+Windows PowerShell commands used for the prototype and troubleshooting steps.
+
 ### Prerequisites
 
 - Git
