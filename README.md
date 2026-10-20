@@ -18,7 +18,7 @@ surface-temperature, and USB-current measurements, then classify devices for
 refurbishment, recycling, or safe disposal. Devices remain closed throughout
 the test; batteries are never manually removed.
 
-[Live Demo](#live-demo) · [System Architecture](#system-architecture) · [Security & Privacy](#security--privacy) · [MIT License](LICENSE)
+[Live Demo](#live-demo) · [Dashboard Screens](#dashboard-screens) · [Exhibit Kiosk](#exhibit-kiosk) · [System Architecture](#system-architecture) · [Security & Privacy](#security--privacy) · [MIT License](LICENSE)
 
 > **Prototype safety notice:** This repository is an initial software
 > prototype. Sensor acquisition requires station-specific calibration values.
@@ -50,27 +50,90 @@ the internal condition of battery cells.
 
 ## 🚀 Live Demo
 
-[Live demo coming soon](#live-demo)
+The ReGrade dashboard and exhibit kiosk are deployed on Vercel:
 
-The dashboard starter is available locally, but no hosted service is running
-yet. The dashboard requires a configured Supabase project and displays an
-explicit setup message until project credentials are provided.
+- [Open ReGrade](https://regrade-dashboard.vercel.app/) — starts in the looping
+  exhibit presentation.
+- [Open the operator overview](https://regrade-dashboard.vercel.app/overview)
+- [Open the exhibit kiosk directly](https://regrade-dashboard.vercel.app/exhibit)
+
+The web app includes operator screens for diagnostics, inventory, sorting,
+safety alerts, reports, and settings. Some screens use clearly labeled sample
+data. Only the latest station readings and reference weights use Supabase when
+the project is configured. The kiosk can run without an attached station.
 
 ---
 
 ## 📸 Screenshots
 
-The dashboard is now implemented as a starter, but no genuine screenshots have
-been captured for the project yet. Add reviewed dashboard and test-station
-screenshots here as the prototype is built and tested.
+The deployed interface shown in the project screenshots includes the exhibit
+story screen and the dashboard's Overview, Diagnostics, Inventory, and Reports
+screens. Open each live screen below; screenshot image files are not yet stored
+in this repository.
 
-| Dashboard / Inventory              | ReGrade Test Station                  |
-| ---------------------------------- | ------------------------------------- |
-| _Dashboard screenshot coming soon_ | _Test-station screenshot coming soon_ |
+| Screen | Live preview | What it shows |
+| --- | --- | --- |
+| Exhibit story | [Open exhibit](https://regrade-dashboard.vercel.app/exhibit) | Full-screen, dark green presentation with animated phone artwork and timed slide transitions. |
+| Overview | [Open overview](https://regrade-dashboard.vercel.app/overview) | Triage summary, safety alert, device metrics, classification summary, and operator decision panel. |
+| Diagnostics | [Open diagnostics](https://regrade-dashboard.vercel.app/diagnostics) | Single-device workflow, grading reference, and station report review. |
+| Inventory | [Open inventory](https://regrade-dashboard.vercel.app/inventory) | Device audit log with classification filters and search. |
+| Reports | [Open reports](https://regrade-dashboard.vercel.app/reports) | Classification trends, top reasons for recycle/disposal, and saved report exports. |
 
-| Diagnostic Cycle              |
-| ----------------------------- |
-| _Walkthrough GIF coming soon_ |
+The dashboard pages use sample records unless a section is explicitly labeled
+as live station data. These screens are an operator-interface prototype; they
+do not indicate that a real device has been diagnosed or routed.
+
+---
+
+## Dashboard Screens
+
+The operator dashboard uses a light, responsive layout with shared navigation.
+It includes:
+
+- **Overview (`/overview`):** sample triage counts, classification summaries,
+  and a recent device snapshot. The exhibit's Explore Dashboard action opens here.
+- **Diagnostics (`/diagnostics`):** one-device-at-a-time workflow, grading
+  limits, and station report review. Real scans are started on the physical
+  station; the dashboard cannot start a scan while the station is offline.
+  Selecting a report opens its readings, safety flags, phone-reference
+  comparison, and operator disposition form.
+- **Inventory (`/inventory`):** device audit log with classification filters
+  and device-ID search.
+- **Sorting and Safety Alerts:** these are not in the main navigation. Sorting
+  queues and bin dispatch are omitted because the prototype scans one device at
+  a time. Safety flags appear with the relevant scan result in Diagnostics.
+- **Reports (`/reports`):** sample classification trends and export controls.
+- **Settings (`/settings`):** local display and notification preferences.
+
+The screens demonstrate the intended operator workflow. Settings are saved in
+the current browser. CSV exports download report data; PDF uses the browser's
+Print / Save as PDF dialog. Reference phones are loaded from Supabase. Signed-in
+operators can add models and save diagnosis reviews after applying the
+`20261021080000_allow_operator_phone_references.sql` migration. The station
+firmware does not transmit brand or model, so an operator chooses the reference
+model during review. Sample dashboard counts remain illustrative.
+
+---
+
+## Exhibit Kiosk
+
+The `/exhibit` route is a full-screen, responsive presentation designed to
+autoplay on a display while visitors wait. It loops through 13 timed scenes and
+includes pause/play, next/previous, and slide-selection controls. Its motion
+includes word-by-word text reveals, floating phone artwork, sensor scan beams,
+and animated station illustrations. The page respects reduced-motion settings.
+
+The exhibit introduces the e-waste problem, ReGrade's non-destructive concept,
+the station prototype from front/side/back, a four-step walkthrough, the system
+data flow, the team, visitor activities, and prototype limitations. The team
+scene spotlights each member and their portrait. The visitor activity scene
+automatically spotlights two ways to participate: discuss donating an unused
+phone or request a phone consultation. Visitors speak with the team at the
+exhibit table; the kiosk does not collect contact details or donations.
+
+A video interlude appears between walkthrough scenes. It shows a placeholder
+until `NEXT_PUBLIC_EXHIBIT_VIDEO_URL` is set to a playable video URL in the
+dashboard environment. A demo video is not included yet.
 
 ---
 
@@ -371,7 +434,7 @@ regrade/
 ├── cad/                       # Mechanical design files and notes
 ├── circuit/                   # Schematics, wiring, and electrical safety notes
 ├── cloud/                     # MQTT listener and Supabase telemetry ingestion
-├── dashboard/                 # Next.js App Router dashboard starter
+├── dashboard/                 # Next.js operator dashboard and exhibit kiosk
 │   ├── app/                   # Pages, layout, and responsive styles
 │   ├── lib/supabase/          # Browser and server Supabase clients
 │   ├── proxy.ts               # Supabase Auth cookie refresh
@@ -415,7 +478,8 @@ Distributed under the MIT License. See [LICENSE](LICENSE) for details.
 ## 👩‍💻 Meet the Team
 
 The ReGrade exhibit introduces each project member in an automatically rotating
-spotlight. Team portraits will be added when they are available.
+spotlight. Portraits are stored in `dashboard/public/images/team/` and displayed
+in the kiosk's responsive portrait frames.
 
 | Team Member | Project Role |
 | --- | --- |

@@ -7335,3 +7335,54 @@ a {
     filter: none !important;
   }
 }
+
+/* Reading component selectors used on Overview and Diagnostics. */
+.rg-reading {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 15px;
+  border: 1px solid var(--rg-line);
+  border-radius: var(--rg-radius-lg);
+  background: #fff;
+}
+.rg-reading__label { color: #4f6057; font-size: 12px; font-weight: 600; }
+.rg-reading__value { color: var(--rg-ink); font-size: 22px; font-weight: 750; line-height: 1.2; }
+.rg-reading__value small { color: var(--rg-muted); font-size: 12px; font-weight: 500; }
+.rg-reading__limit { color: var(--rg-subtle); font-size: 11px; line-height: 1.35; }
+.rg-reading__status { min-height: 18px; display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; }
+.rg-reading__status svg { width: 13px; height: 13px; flex: 0 0 13px; }
+.rg-reading__status--ok { color: var(--rg-safe); }
+.rg-reading__status--warn { color: var(--rg-warn); }
+.rg-reading__status--over { color: var(--rg-danger); }
+.rg-reading__status--measuring { color: var(--rg-muted); }
+.rg-bar { height: 5px; overflow: hidden; border-radius: 999px; background: var(--rg-line-soft); }
+.rg-bar__fill { height: 100%; border-radius: inherit; transition: width .35s ease; }
+.rg-bar__fill--ok { background: var(--rg-safe); }
+.rg-bar__fill--warn { background: var(--rg-warn); }
+.rg-bar__fill--over { background: var(--rg-danger); }
+.rg-bar__fill--measuring { background: #9db0a5; }
+.rg-mid-grid--overview { grid-template-columns: minmax(0, 1fr); }
+.rg-readings-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); align-items: stretch; }
+@media (max-width: 900px) { .rg-readings-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .rg-readings-grid { grid-template-columns: 1fr; } }
+.rg-diag-split--rules-only { grid-template-columns: minmax(0, 1fr); }
+.rg-result-modal { width: min(900px, calc(100vw - 32px)); max-height: min(88vh, 900px); overflow: auto; }
+.rg-result-warning { display: flex; gap: 12px; padding: 14px; margin: 16px 0; color: #8c251e; background: #fff1ef; border: 1px solid #f3c6c1; border-radius: 12px; }
+.rg-result-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 20px 0; }
+.rg-result-summary > div, .rg-result-readings > div { display: flex; flex-direction: column; gap: 5px; min-width: 0; padding: 12px; background: #f5f8f6; border-radius: 10px; overflow-wrap: anywhere; }
+.rg-result-summary span, .rg-result-readings span { color: var(--rg-muted); font-size: 12px; }
+.rg-result-readings { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 12px 0 18px; }
+.rg-reference-compare { display: grid; gap: 10px; margin: 18px 0; padding: 16px; border: 1px solid var(--rg-line); border-radius: 12px; }
+.rg-reference-compare select, .rg-reference-form input { min-height: 40px; padding: 8px 10px; color: var(--rg-ink); background: #fff; border: 1px solid var(--rg-line); border-radius: 8px; }
+.rg-decision-select { display: grid; gap: 8px; margin: 14px 0; font-weight: 650; }
+.rg-decision-select select { min-height: 42px; padding: 8px 10px; color: var(--rg-ink); background: #fff; border: 1px solid var(--rg-line); border-radius: 8px; }
+.rg-reference-compare__values { display: grid; gap: 6px; padding: 12px; background: #f5f8f6; border-radius: 8px; font-size: 13px; }
+.rg-reference-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 14px 0 20px; padding: 16px; background: #f5f8f6; border-radius: 12px; }
+.rg-reference-form label { display: grid; gap: 6px; color: var(--rg-muted); font-size: 12px; }
+.rg-reference-form button, .rg-reference-form > span { align-self: end; }
+.rg-next-step-note { display: grid; gap: 10px; margin-top: 18px; padding: 16px; background: #f5f8f6; border: 1px solid var(--rg-line); border-radius: 12px; }
+.rg-next-step-note > span { color: var(--rg-muted); font-size: 13px; line-height: 1.6; }
+@media (max-width: 700px) { .rg-result-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } .rg-result-readings { grid-template-columns: repeat(2, minmax(0, 1fr)); } .rg-reference-form { grid-template-columns: 1fr; } }
+@media print { .rg-shell > header, .rg-titlebar__actions, .rg-toolbar, .rg-pagination-actions, .rg-btn, .rg-reference-form { display: none !important; } .rg-shell, .rg-main, .rg-page { width: 100% !important; max-width: none !important; padding: 0 !important; background: #fff !important; } .rg-card { box-shadow: none !important; break-inside: avoid; } }

@@ -1,1 +1,5 @@
-export { default } from "../safety_alerts";
+import { redirect } from "next/navigation";
+
+export default function SafetyAlertsPage() {
+  redirect("/diagnostics");
+}

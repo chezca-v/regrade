@@ -1,6 +1,5 @@
 "use client";
 
-import React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -8,23 +7,16 @@ import { usePathname } from "next/navigation";
 interface NavItem {
   label: string;
   href: string;
-  badge?: number;
 }
 
 const NAV_ITEMS: NavItem[] = [
   { label: "Overview", href: "/overview" },
   { label: "Diagnostics", href: "/diagnostics" },
   { label: "Inventory", href: "/inventory" },
-  { label: "Sorting", href: "/sorting" },
-  { label: "Safety alerts", href: "/safety-alerts", badge: 2 },
   { label: "Reports", href: "/reports" },
 ];
 
-interface TopNavProps {
-  alertCount?: number;
-}
-
-export function TopNav({ alertCount = 2 }: TopNavProps) {
+export function TopNav() {
   const pathname = usePathname();
 
   return (
@@ -52,7 +44,6 @@ export function TopNav({ alertCount = 2 }: TopNavProps) {
         <nav className="rg-nav-pill" aria-label="Main navigation">
           {NAV_ITEMS.map((item) => {
             const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
-            const liveCount = item.label === "Safety alerts" ? alertCount : item.badge;
             return (
               <Link
                 key={item.href}
@@ -61,11 +52,6 @@ export function TopNav({ alertCount = 2 }: TopNavProps) {
                 aria-current={isActive ? "page" : undefined}
               >
                 {item.label}
-                {liveCount != null && liveCount > 0 && (
-                  <b className="rg-nav-badge" aria-label={`${liveCount} alerts`}>
-                    {liveCount}
-                  </b>
-                )}
               </Link>
             );
           })}
@@ -73,12 +59,6 @@ export function TopNav({ alertCount = 2 }: TopNavProps) {
 
         {/* Right side */}
         <div className="rg-topnav__right">
-          <button className="rg-icon-btn" aria-label="Notifications">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-              <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-            </svg>
-          </button>
           <Link
             href="/settings"
             className={`rg-icon-btn${pathname === "/settings" ? " rg-icon-btn--active" : ""}`}
@@ -96,7 +76,6 @@ export function TopNav({ alertCount = 2 }: TopNavProps) {
               <line x1="17" y1="16" x2="23" y2="16" />
             </svg>
           </Link>
-          <span className="rg-avatar" aria-label="Operator profile">OP</span>
         </div>
       </div>
     </header>

@@ -182,11 +182,10 @@ export const QUEUE: QueueDevice[] = [
 // Current test stages (Diagnostics page)
 // ---------------------------------------------------------------------------
 export const STAGES: Stage[] = [
-  { label: "Scan", sub: "Done at 14:41", state: "done" },
-  { label: "Electrical check", sub: "In progress", state: "active" },
-  { label: "Grade", sub: "Waiting", state: "waiting" },
-  { label: "Sort", sub: "Waiting", state: "waiting" },
-  { label: "Report", sub: "Waiting", state: "waiting" },
+  { label: "Identify phone", sub: "Brand + model", state: "waiting" },
+  { label: "Measure", sub: "At the station", state: "waiting" },
+  { label: "Compare", sub: "Against reference", state: "waiting" },
+  { label: "Review + save", sub: "Operator action", state: "waiting" },
 ];
 
 // ---------------------------------------------------------------------------

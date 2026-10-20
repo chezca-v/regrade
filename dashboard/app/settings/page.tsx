@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { TopNav } from "../components/TopNav";
 
 // --- Chevron Icon for Selects ---
@@ -44,6 +44,8 @@ function ToggleSwitch({ checked, onChange, ariaLabel }: ToggleProps) {
   );
 }
 
+const SETTINGS_STORAGE_KEY = "regrade-dashboard-settings-v1";
+
 export default function SettingsPage() {
   // Notification Toggles
   const [safetyAlertPopup, setSafetyAlertPopup] = useState(true);
@@ -63,20 +65,68 @@ export default function SettingsPage() {
   // Save feedback state
   const [savedMessage, setSavedMessage] = useState(false);
 
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(SETTINGS_STORAGE_KEY);
+      if (!saved) return;
+      const values = JSON.parse(saved) as Record<string, unknown>;
+      if (typeof values.safetyAlertPopup === "boolean") setSafetyAlertPopup(values.safetyAlertPopup);
+      if (typeof values.soundDisposal === "boolean") setSoundDisposal(values.soundDisposal);
+      if (typeof values.awaitingReminder === "boolean") setAwaitingReminder(values.awaitingReminder);
+      if (typeof values.dailySummary === "boolean") setDailySummary(values.dailySummary);
+      if (typeof values.weightUnit === "string") setWeightUnit(values.weightUnit);
+      if (typeof values.temperatureUnit === "string") setTemperatureUnit(values.temperatureUnit);
+      if (typeof values.timeFormat === "string") setTimeFormat(values.timeFormat);
+      if (typeof values.language === "string") setLanguage(values.language);
+      if (typeof values.useSampleData === "boolean") setUseSampleData(values.useSampleData);
+    } catch {
+      localStorage.removeItem(SETTINGS_STORAGE_KEY);
+    }
+  }, []);
+
   const handleDiscard = () => {
-    setSafetyAlertPopup(true);
-    setSoundDisposal(true);
-    setAwaitingReminder(true);
-    setDailySummary(false);
-    setWeightUnit("Grams (g)");
-    setTemperatureUnit("Degrees Celsius (°C)");
-    setTimeFormat("24-hour");
-    setLanguage("English");
-    setUseSampleData(true);
+    try {
+      const saved = localStorage.getItem(SETTINGS_STORAGE_KEY);
+      if (saved) {
+        const values = JSON.parse(saved) as Record<string, unknown>;
+        setSafetyAlertPopup(typeof values.safetyAlertPopup === "boolean" ? values.safetyAlertPopup : true);
+        setSoundDisposal(typeof values.soundDisposal === "boolean" ? values.soundDisposal : true);
+        setAwaitingReminder(typeof values.awaitingReminder === "boolean" ? values.awaitingReminder : true);
+        setDailySummary(typeof values.dailySummary === "boolean" ? values.dailySummary : false);
+        setWeightUnit(typeof values.weightUnit === "string" ? values.weightUnit : "Grams (g)");
+        setTemperatureUnit(typeof values.temperatureUnit === "string" ? values.temperatureUnit : "Degrees Celsius (°C)");
+        setTimeFormat(typeof values.timeFormat === "string" ? values.timeFormat : "24-hour");
+        setLanguage(typeof values.language === "string" ? values.language : "English");
+        setUseSampleData(typeof values.useSampleData === "boolean" ? values.useSampleData : true);
+      } else {
+        setSafetyAlertPopup(true);
+        setSoundDisposal(true);
+        setAwaitingReminder(true);
+        setDailySummary(false);
+        setWeightUnit("Grams (g)");
+        setTemperatureUnit("Degrees Celsius (°C)");
+        setTimeFormat("24-hour");
+        setLanguage("English");
+        setUseSampleData(true);
+      }
+    } catch {
+      localStorage.removeItem(SETTINGS_STORAGE_KEY);
+    }
     setSavedMessage(false);
   };
 
   const handleSave = () => {
+    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify({
+      safetyAlertPopup,
+      soundDisposal,
+      awaitingReminder,
+      dailySummary,
+      weightUnit,
+      temperatureUnit,
+      timeFormat,
+      language,
+      useSampleData,
+    }));
     setSavedMessage(true);
     setTimeout(() => setSavedMessage(false), 3000);
   };
@@ -91,7 +141,7 @@ export default function SettingsPage() {
             <div>
               <h1>Settings</h1>
               <p className="rg-sub">
-                Notifications, display and data source. Grading limits are view only.
+                Preferences are saved in this browser. Notification effects and unit conversion are not connected to live station actions yet; grading limits are view only.
               </p>
             </div>
             <div className="rg-titlebar__actions">
@@ -381,7 +431,7 @@ export default function SettingsPage() {
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                 <polyline points="20 6 9 17 4 12" />
               </svg>
-              <span>Settings saved successfully</span>
+              <span>Settings saved on this device</span>
             </div>
           )}
         </div>

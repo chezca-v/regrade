@@ -1,7 +1,9 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
+import Link from "next/link";
 import type { WeightModelRow } from "./page";
+import { createClient } from "@/lib/supabase/client";
 
 interface Props {
   initialModels: WeightModelRow[];
@@ -45,6 +47,10 @@ function SearchIcon() {
 }
 
 export default function ReferenceWeightsClient({ initialModels }: Props) {
+  const [models, setModels] = useState(initialModels);
+  const [formOpen, setFormOpen] = useState(false);
+  const [formMessage, setFormMessage] = useState("");
+  const [saving, setSaving] = useState(false);
   const [selectedBrand, setSelectedBrand] = useState("All brands");
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -53,15 +59,15 @@ export default function ReferenceWeightsClient({ initialModels }: Props) {
   // Extract unique brands for dropdown
   const brands = useMemo(() => {
     const brandSet = new Set<string>();
-    initialModels.forEach((m) => {
+    models.forEach((m) => {
       if (m.brand) brandSet.add(m.brand);
     });
     return ["All brands", ...Array.from(brandSet).sort()];
-  }, [initialModels]);
+  }, [models]);
 
   // Filtered models
   const filteredModels = useMemo(() => {
-    return initialModels.filter((item) => {
+    return models.filter((item) => {
       if (selectedBrand !== "All brands" && item.brand !== selectedBrand) {
         return false;
       }
@@ -75,7 +81,42 @@ export default function ReferenceWeightsClient({ initialModels }: Props) {
       }
       return true;
     });
-  }, [initialModels, selectedBrand, searchQuery]);
+  }, [models, selectedBrand, searchQuery]);
+
+  async function addReference(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    setSaving(true);
+    setFormMessage("");
+    const form = new FormData(formElement);
+    const brand = String(form.get("brand") ?? "").trim();
+    const model = String(form.get("model") ?? "").trim();
+    const weight = Number(form.get("weight"));
+    const thicknessInput = String(form.get("thickness") ?? "").trim();
+    const thickness = thicknessInput ? Number(thicknessInput) : null;
+    if (!brand || !model || !Number.isFinite(weight) || weight <= 0 || (thickness !== null && (!Number.isFinite(thickness) || thickness <= 0))) {
+      setFormMessage("Enter a brand, model, positive weight, and a valid optional thickness.");
+      setSaving(false);
+      return;
+    }
+    try {
+      const client = createClient();
+      const { data: { user } } = await client.auth.getUser();
+      if (!user) throw new Error("Sign in first to add a shared phone reference.");
+      const { data, error } = await client.from("device_model").insert({
+        brand, model_name: model, device_type: "phone", baseline_weight_g: weight,
+        baseline_thickness_mm: thickness, nominal_current_ma: null, source: "operator-added", created_by: user.id,
+      }).select("model_id").single();
+      if (error) throw error;
+      setModels((current) => [{ id: data.model_id, brand, model, nominalWeightG: weight, acceptedRange: `${(weight * .95).toFixed(1)} to ${(weight * 1.05).toFixed(1)} g`, recycleBelow: `Under ${(weight * .85).toFixed(1)} g`, lastUpdated: "Just added" }, ...current]);
+      setFormMessage("Reference saved for future sessions.");
+      formElement.reset();
+    } catch (error) {
+      setFormMessage(error instanceof Error ? error.message : "Could not save. Apply the operator phone references migration and try again.");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   const totalPages = Math.max(1, Math.ceil(filteredModels.length / pageSize));
   const activePage = Math.min(currentPage, totalPages);
@@ -92,9 +133,18 @@ export default function ReferenceWeightsClient({ initialModels }: Props) {
       <div className="rg-card-head">
         <h3>Smartphone models</h3>
         <p className="rg-sub">
-          Nominal reference weights and thresholds for automated grading.
+          Phone weights used as comparison references. Measured results still need operator review.
         </p>
+        <button className="rg-btn" type="button" onClick={() => setFormOpen((value) => !value)}>{formOpen ? "Close form" : "Add reference phone"}</button>
       </div>
+      {formOpen && <form className="rg-reference-form" onSubmit={addReference}>
+        <label>Brand<input name="brand" required maxLength={80} placeholder="e.g. Samsung" /></label>
+        <label>Model<input name="model" required maxLength={120} placeholder="e.g. Galaxy S24" /></label>
+        <label>Healthy reference weight (g)<input name="weight" type="number" min="1" step="0.1" required /></label>
+        <label>Thickness (mm), optional<input name="thickness" type="number" min="0.1" step="0.1" /></label>
+        <button className="rg-btn rg-btn--primary" type="submit" disabled={saving}>{saving ? "Saving…" : "Save phone reference"}</button>
+        {formMessage && <span className="rg-small" role="status">{formMessage} {formMessage.startsWith("Sign in") && <Link href="/login">Sign in</Link>}</span>}
+      </form>}
 
       {/* Controls Toolbar */}
       <div className="rg-toolbar">

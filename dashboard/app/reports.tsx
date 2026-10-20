@@ -90,18 +90,41 @@ const SAVED_REPORTS: SavedReport[] = [
 export function ReportsPage() {
   const [dateRange] = useState("7 to 13 Oct 2026");
 
-  function handleDownload(report: SavedReport) {
-    const dummy =
-      report.format === "CSV"
-        ? "data:text/csv;charset=utf-8,ID,Report,Period,Created\n" +
-          `"${report.id}","${report.name}","${report.period}","${report.created}"`
-        : "data:application/pdf;base64,JVBERi0xLjAKMSAwIG9iajw8L1R5cGUvQ2F0YWxvZy9QYWdlcyAyIDAgUj4+ZW5kb2Jq";
+  function downloadCsv(name: string, contents: string) {
+    const blob = new Blob([contents], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
-    link.href = encodeURI(dummy);
-    link.download = `${report.name.toLowerCase().replace(/\s+/g, "-")}.${report.format.toLowerCase()}`;
+    link.href = url;
+    link.download = name;
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
+    link.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  function handleExportReport() {
+    const rows = [
+      ["Day", "Total tested", "Resellable", "Recycle", "Disposal"],
+      ...DAILY_RESULTS.map((row) => [row.day, row.total, row.resellable, row.recycle, row.disposal]),
+    ];
+    downloadCsv("regrade-weekly-report.csv", rows.map((row) => row.join(",")).join("\r\n"));
+  }
+
+  function handleDownloadPdf() {
+    window.print();
+  }
+
+  function handleDownload(report: SavedReport) {
+    if (report.format === "CSV") {
+      downloadCsv(
+        `${report.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.csv`,
+        [["Report", "Period", "Created"], [report.name, report.period, report.created]]
+          .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+          .join("\r\n"),
+      );
+      return;
+    }
+    window.print();
   }
 
   // Max daily total for proportional chart scaling (52 total -> 160px)
@@ -124,8 +147,8 @@ export function ReportsPage() {
                 <span>{dateRange}</span>
                 <ChevronDownIcon />
               </div>
-              <button className="rg-btn">Export report</button>
-              <button className="rg-btn rg-btn--primary">Download PDF</button>
+              <button className="rg-btn" onClick={handleExportReport}>Export CSV</button>
+              <button className="rg-btn rg-btn--primary" onClick={handleDownloadPdf}>Print / Save PDF</button>
             </div>
           </div>
 
@@ -141,21 +164,21 @@ export function ReportsPage() {
               <span className="rg-kpi__value" style={{ color: "var(--rg-safe)" }}>
                 57%
               </span>
-              <span className="rg-kpi__sub">163 devices, Bin A</span>
+              <span className="rg-kpi__sub">163 resellable classifications</span>
             </div>
             <div className="rg-kpi">
               <span className="rg-kpi__label">Recycle</span>
               <span className="rg-kpi__value" style={{ color: "var(--rg-recycle)" }}>
                 31%
               </span>
-              <span className="rg-kpi__sub">89 devices, Bin B</span>
+              <span className="rg-kpi__sub">89 recycle classifications</span>
             </div>
             <div className="rg-kpi">
               <span className="rg-kpi__label">Disposal</span>
               <span className="rg-kpi__value rg-kpi--danger" style={{ color: "var(--rg-danger)" }}>
                 11%
               </span>
-              <span className="rg-kpi__sub">32 devices, Bin C</span>
+              <span className="rg-kpi__sub">32 disposal classifications</span>
             </div>
           </section>
 
@@ -265,7 +288,7 @@ export function ReportsPage() {
                           className="rg-btn"
                           onClick={() => handleDownload(rep)}
                         >
-                          Download
+                          {rep.format === "PDF" ? "Print / Save PDF" : "Download CSV"}
                         </button>
                       </td>
                     </tr>

@@ -9,6 +9,12 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next({ request });
   }
 
+  // Public dashboard pages do not need an auth network round-trip for visitors
+  // without a Supabase session. Keep claim refresh for authenticated sessions.
+  if (!request.cookies.getAll().some(({ name }) => name.startsWith("sb-") && name.includes("-auth-token"))) {
+    return NextResponse.next({ request });
+  }
+
   let response = NextResponse.next({ request });
   const supabase = createServerClient<Database>(url, key, {
     cookies: {

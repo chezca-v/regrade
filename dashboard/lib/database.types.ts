@@ -32,6 +32,8 @@ export type Database = {
         baseline_weight_g: number;
         baseline_thickness_mm: number | null;
         nominal_current_ma: number | null;
+          source?: "catalog" | "operator-added";
+          created_by?: string | null;
       }>;
       station_telemetry: Table<{
         telemetry_id: number;
@@ -45,6 +47,15 @@ export type Database = {
         health_score: number | null;
         sort_success: boolean | null;
         reported_at: string;
+      }>;
+      operator_diagnosis: Table<{
+        diagnosis_id: number;
+        telemetry_id: number;
+        operator_id: string;
+        device_model_id: number | null;
+        decision: "resellable" | "recycle" | "disposal" | "needs-review";
+        notes: string | null;
+        created_at: string;
       }>;
     };
     Views: Record<string, never>;

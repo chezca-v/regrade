@@ -1,40 +1,26 @@
 "use client";
 
 import "./globals.css";
-import React, { useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { TopNav } from "./components/TopNav";
 import { Pill } from "./components/Pill";
 import { ReadingCard } from "./components/ReadingCard";
-import {
-  CheckIcon,
-  ClockIcon,
-  WarnIcon,
-  SearchIcon,
-  SortIcon,
-} from "./components/Icons";
+import { CheckIcon, ClockIcon, WarnIcon, SearchIcon, SortIcon } from "./components/Icons";
 import { DEVICES } from "@/lib/rg-data";
 import {
   RESULT_LABEL,
   RESULT_COLOR,
-  DECISION_LABEL,
-  DECISION_BIN,
   filterDevices,
   countTestedToday,
   countAwaiting,
   countResellable,
-  countSafetyAlerts,
-  countRouted,
   countByResult,
   pctByResult,
   fmtDate,
   type AuditTab,
 } from "@/lib/rg-helpers";
-import type {
-  Device,
-  DiagnosticResult,
-  ProcessingDecision,
-} from "@/lib/rg-types";
+import type { DiagnosticResult } from "@/lib/rg-types";
 
 const TABS: { id: AuditTab; label: string }[] = [
   { id: "all", label: "All devices" },
@@ -44,72 +30,18 @@ const TABS: { id: AuditTab; label: string }[] = [
   { id: "awaiting", label: "Needs verification" },
 ];
 
-function OverrideModal({
-  device,
-  onClose,
-  onConfirm,
-}: {
-  device: Device;
-  onClose: () => void;
-  onConfirm: (reason: string) => void;
-}) {
-  const [reason, setReason] = useState("");
-  return (
-    <div
-      className="rg-modal-backdrop"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Override decision"
-    >
-      <div className="rg-modal">
-        <h3>Override decision</h3>
-        <p className="rg-modal__sub">
-          Overriding the automated result for <strong>{device.id}</strong>. Provide a reason before continuing.
-        </p>
-        <label className="rg-modal__label" htmlFor="override-reason">
-          Reason for override
-        </label>
-        <textarea
-          id="override-reason"
-          className="rg-modal__textarea"
-          placeholder="e.g. Physical inspection shows battery in good condition"
-          value={reason}
-          onChange={(e) => setReason(e.target.value)}
-          rows={3}
-        />
-        <div className="rg-modal__actions">
-          <button className="rg-btn" onClick={onClose}>
-            Cancel
-          </button>
-          <button
-            className="rg-btn rg-btn--primary"
-            disabled={reason.trim().length < 5}
-            onClick={() => onConfirm(reason)}
-          >
-            Confirm override
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export function DashboardPage() {
   const router = useRouter();
-  const [devices, setDevices] = useState<Device[]>(DEVICES);
+  const devices = DEVICES;
   const [selectedId, setSelectedId] = useState<string>(DEVICES[0].id);
+  const selected = devices.find((device) => device.id === selectedId) ?? devices[0];
   const [tab, setTab] = useState<AuditTab>("all");
   const [query, setQuery] = useState("");
   const [sortNewest, setSortNewest] = useState(true);
-  const [overrideDevice, setOverrideDevice] = useState<Device | null>(null);
-
-  const selected = devices.find((d) => d.id === selectedId) ?? devices[0];
 
   const totalTested = countTestedToday(devices);
   const awaitingCount = countAwaiting(devices);
-  const routedCount = countRouted(devices);
   const resellableCount = countResellable(devices);
-  const alertCount = countSafetyAlerts(devices);
   const resellPct = pctByResult(devices, "resellable");
 
   const filteredDevices = useMemo(
@@ -117,32 +49,11 @@ export function DashboardPage() {
     [devices, tab, query, sortNewest]
   );
 
-  function handleVerify() {
-    const bin = DECISION_BIN[selected.diagnosticResult];
-    setDevices((prev) =>
-      prev.map((d) =>
-        d.id === selected.id ? { ...d, processingDecision: bin } : d
-      )
-    );
-  }
-
-  function handleOverrideConfirm(_reason: string) {
-    void _reason;
-    setOverrideDevice(null);
-    setDevices((prev) =>
-      prev.map((d) =>
-        d.id === selected.id
-          ? { ...d, processingDecision: DECISION_BIN[d.diagnosticResult] }
-          : d
-      )
-    );
-  }
-
   const today = fmtDate(new Date());
 
   return (
     <div className="rg-shell">
-      <TopNav alertCount={alertCount} />
+      <TopNav />
       <main className="rg-main">
         <div className="rg-page">
           {/* Title bar */}
@@ -153,36 +64,15 @@ export function DashboardPage() {
             </div>
             <div className="rg-titlebar__actions">
               <span className="rg-tag">Sample data</span>
-              <button className="rg-btn">Export report</button>
+              <button className="rg-btn" onClick={() => router.push("/reports")}>View reports</button>
               <button
                 className="rg-btn rg-btn--primary"
                 onClick={() => router.push("/diagnostics")}
               >
-                ＋ New diagnostic test
+                Open diagnostics
               </button>
             </div>
           </div>
-
-          {/* Safety alert banner */}
-          {alertCount > 0 && (
-            <section className="rg-alert-banner" role="alert">
-              <span className="rg-alert-banner__icon">
-                <WarnIcon size={20} />
-              </span>
-              <div className="rg-alert-banner__body">
-                <strong>Safety alert: battery swelling on REG-20261013-004</strong>
-                <p>
-                  Wear gloves and move the device to the quarantine shelf. Do not charge it.
-                </p>
-              </div>
-              <button
-                className="rg-btn"
-                onClick={() => router.push("/safety-alerts")}
-              >
-                Review alert
-              </button>
-            </section>
-          )}
 
           {/* KPI cards */}
           <section className="rg-kpi-grid" aria-label="Today's KPIs">
@@ -190,13 +80,13 @@ export function DashboardPage() {
               <span className="rg-kpi__label">Tested today</span>
               <span className="rg-kpi__value">{totalTested}</span>
               <span className="rg-kpi__sub">
-                {routedCount} routed, {awaitingCount} awaiting verification
+                {awaitingCount} awaiting verification
               </span>
             </div>
             <div className="rg-kpi">
               <span className="rg-kpi__label">Awaiting verification</span>
               <span className="rg-kpi__value">{awaitingCount}</span>
-              <span className="rg-kpi__sub">Diagnosed, not yet routed</span>
+              <span className="rg-kpi__sub">Sample results awaiting operator review</span>
             </div>
             <div className="rg-kpi">
               <span className="rg-kpi__label">Resellable / Refurbishable</span>
@@ -205,15 +95,10 @@ export function DashboardPage() {
                 {resellPct}% of devices tested today
               </span>
             </div>
-            <div className="rg-kpi rg-kpi--danger">
-              <span className="rg-kpi__label">Safety alerts</span>
-              <span className="rg-kpi__value">{alertCount}</span>
-              <span className="rg-kpi__sub">Needs immediate review</span>
-            </div>
           </section>
 
           {/* Middle grid: device detail + decision */}
-          <div className="rg-mid-grid">
+          <div className="rg-mid-grid rg-mid-grid--overview">
             <div className="rg-mid-left">
               {/* Device detail */}
               <section className="rg-card rg-card--pad">
@@ -221,8 +106,7 @@ export function DashboardPage() {
                   <div>
                     <h3 className="rg-device-id">{selected.id}</h3>
                     <p className="rg-small rg-muted">
-                      Smartphone, {selected.model} (placeholder),{" "}
-                      {selected.nominalWeight} g nominal
+                      {selected.brand === "Unknown" ? "Brand not recorded" : selected.brand}, {selected.model} · Reference weight {selected.nominalWeight} g
                     </p>
                   </div>
                   <span className="rg-small rg-muted rg-row rg-row--gap6">
@@ -241,12 +125,8 @@ export function DashboardPage() {
                   {[
                     { label: "Scan", done: true },
                     { label: "Electrical check", done: true },
-                    { label: "Grade", done: true },
-                    {
-                      label: "Sort: awaiting verification",
-                      done: selected.processingDecision !== "awaiting",
-                    },
-                    { label: "Report", done: false },
+                    { label: "Review results", done: true },
+                    { label: "Save diagnosis", done: false },
                   ].map((s) => (
                     <span
                       key={s.label}
@@ -277,10 +157,10 @@ export function DashboardPage() {
                           <span className="rg-small rg-muted">
                             {pct}% of devices,{" "}
                             {r === "resellable"
-                              ? "Bin A"
+                              ? "sample records"
                               : r === "recycle"
-                              ? "Bin B"
-                              : "Bin C"}
+                              ? "sample records"
+                              : "sample records"}
                           </span>
                           <div className="rg-sumbar">
                             <div
@@ -296,90 +176,7 @@ export function DashboardPage() {
               </section>
             </div>
 
-            {/* Decision panel */}
-            <aside className="rg-card rg-card--pad rg-decision-panel">
-              <h3>Decision</h3>
-              <p className="rg-small rg-muted">
-                The diagnostic result is a suggestion. The processing decision is final only after verification.
-              </p>
 
-              <div className="rg-box rg-box--white">
-                <div className="rg-row rg-row--between rg-row--full">
-                  <strong>Diagnostic result</strong>
-                  <span className="rg-tag">Automated</span>
-                </div>
-                <Pill
-                  color={
-                    RESULT_COLOR[selected.diagnosticResult] as
-                      | "green"
-                      | "blue"
-                      | "red"
-                  }
-                >
-                  {RESULT_LABEL[selected.diagnosticResult]}
-                </Pill>
-                <p className="rg-body">
-                  {selected.diagnosticResult === "resellable"
-                    ? "All readings are inside their limits. Temperature rise is close to the 15 °C limit, so check the casing before listing."
-                    : selected.diagnosticResult === "recycle"
-                    ? "One or more readings exceed the resellable threshold. Safe for dismantling."
-                    : "Multiple readings exceed safe limits. Route to Bin C immediately."}
-                </p>
-              </div>
-
-              <div className="rg-box rg-box--grey">
-                <div className="rg-row rg-row--between rg-row--full">
-                  <strong>Processing decision</strong>
-                  <span className="rg-small rg-muted">
-                    {selected.processingDecision === "awaiting"
-                      ? "Needs operator"
-                      : "Verified"}
-                  </span>
-                </div>
-                {selected.processingDecision === "awaiting" ? (
-                  <Pill color="amber">Awaiting verification</Pill>
-                ) : (
-                  <Pill color="green">
-                    {
-                      DECISION_LABEL[
-                        selected.processingDecision as Exclude<
-                          ProcessingDecision,
-                          "awaiting"
-                        >
-                      ]
-                    }
-                  </Pill>
-                )}
-                <p className="rg-body">
-                  {selected.processingDecision === "awaiting"
-                    ? "Not yet verified. Confirm the result to route this device to Bin A, or override it with a reason."
-                    : `Verified and routed to ${
-                        DECISION_LABEL[
-                          selected.processingDecision as Exclude<
-                            ProcessingDecision,
-                            "awaiting"
-                          >
-                        ]
-                      }.`}
-                </p>
-                {selected.processingDecision === "awaiting" && (
-                  <div className="rg-row rg-row--gap8">
-                    <button
-                      className="rg-btn rg-btn--primary"
-                      onClick={handleVerify}
-                    >
-                      Verify and route
-                    </button>
-                    <button
-                      className="rg-btn"
-                      onClick={() => setOverrideDevice(selected)}
-                    >
-                      Override
-                    </button>
-                  </div>
-                )}
-              </div>
-            </aside>
           </div>
 
           {/* Audit log */}
@@ -439,7 +236,6 @@ export function DashboardPage() {
                     <th>Temp rise</th>
                     <th>Swell</th>
                     <th>Diagnostic result</th>
-                    <th>Processing decision</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -449,7 +245,6 @@ export function DashboardPage() {
                       | "green"
                       | "blue"
                       | "red";
-                    const isAwaiting = d.processingDecision === "awaiting";
                     return (
                       <tr
                         key={d.id}
@@ -480,23 +275,6 @@ export function DashboardPage() {
                             {RESULT_LABEL[d.diagnosticResult]}
                           </Pill>
                         </td>
-                        <td>
-                          {isAwaiting ? (
-                            <Pill color="amber">Awaiting verification</Pill>
-                          ) : (
-                            <span className="rg-row rg-row--gap6">
-                              <CheckIcon size={14} />
-                              {
-                                DECISION_LABEL[
-                                  d.processingDecision as Exclude<
-                                    ProcessingDecision,
-                                    "awaiting"
-                                  >
-                                ]
-                              }
-                            </span>
-                          )}
-                        </td>
                       </tr>
                     );
                   })}
@@ -507,13 +285,7 @@ export function DashboardPage() {
         </div>
       </main>
 
-      {overrideDevice && (
-        <OverrideModal
-          device={overrideDevice}
-          onClose={() => setOverrideDevice(null)}
-          onConfirm={handleOverrideConfirm}
-        />
-      )}
+
     </div>
   );
 }

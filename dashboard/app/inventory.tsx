@@ -23,7 +23,7 @@ export interface AuditRecord {
   swell: string;
   result: "resellable" | "recycle" | "disposal";
   resultLabel: string;
-  decision: "Awaiting verification" | "Verified, Bin A" | "Verified, Bin B" | "Verified, Bin C";
+  decision: "Awaiting verification" | "Operator review saved";
   hasWarning?: boolean;
 }
 
@@ -48,7 +48,7 @@ const INVENTORY_DATA: AuditRecord[] = [
     swell: "0.4 mm",
     result: "resellable",
     resultLabel: "Resellable / Refurbishable",
-    decision: "Verified, Bin A",
+    decision: "Operator review saved",
   },
   {
     id: "REG-20261013-010",
@@ -59,7 +59,7 @@ const INVENTORY_DATA: AuditRecord[] = [
     swell: "2.8 mm",
     result: "recycle",
     resultLabel: "Recycle / Safe Dismantling",
-    decision: "Verified, Bin B",
+    decision: "Operator review saved",
   },
   {
     id: "REG-20261013-009",
@@ -70,7 +70,7 @@ const INVENTORY_DATA: AuditRecord[] = [
     swell: "0.7 mm",
     result: "resellable",
     resultLabel: "Resellable / Refurbishable",
-    decision: "Verified, Bin A",
+    decision: "Operator review saved",
   },
   {
     id: "REG-20261013-007",
@@ -92,7 +92,7 @@ const INVENTORY_DATA: AuditRecord[] = [
     swell: "3.9 mm",
     result: "disposal",
     resultLabel: "Disposal",
-    decision: "Verified, Bin C",
+    decision: "Operator review saved",
   },
   {
     id: "REG-20261013-005",
@@ -103,7 +103,7 @@ const INVENTORY_DATA: AuditRecord[] = [
     swell: "2.4 mm",
     result: "recycle",
     resultLabel: "Recycle / Safe Dismantling",
-    decision: "Verified, Bin B",
+    decision: "Operator review saved",
   },
   {
     id: "REG-20261013-004",
@@ -126,7 +126,7 @@ const INVENTORY_DATA: AuditRecord[] = [
     swell: "0.3 mm",
     result: "resellable",
     resultLabel: "Resellable / Refurbishable",
-    decision: "Verified, Bin A",
+    decision: "Operator review saved",
   },
   {
     id: "REG-20261013-002",
@@ -137,7 +137,7 @@ const INVENTORY_DATA: AuditRecord[] = [
     swell: "0.2 mm",
     result: "resellable",
     resultLabel: "Resellable / Refurbishable",
-    decision: "Verified, Bin A",
+    decision: "Operator review saved",
   },
 ];
 
@@ -300,7 +300,7 @@ export function InventoryPage() {
                     <th>Temp rise</th>
                     <th>Swell</th>
                     <th>Diagnostic result</th>
-                    <th>Processing decision</th>
+                    <th>Operator review</th>
                   </tr>
                 </thead>
                 <tbody>

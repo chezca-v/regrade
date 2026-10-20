@@ -57,7 +57,7 @@ export function SafetyAlertsPage() {
 
   return (
     <div className="rg-shell">
-      <TopNav alertCount={openCount} />
+      <TopNav />
       <main className="rg-main">
         <div className="rg-page">
           {/* Title bar */}

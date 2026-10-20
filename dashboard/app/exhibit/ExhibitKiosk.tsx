@@ -643,7 +643,7 @@ function TeamSlide() {
         ))}
       </div>
       <div className="kiosk-team-note">
-        <i /> PORTRAITS COMING SOON{" "}
+        <i /> THE PEOPLE BEHIND REGRADE{" "}
         <span>THE SPOTLIGHT MOVES THROUGH EACH TEAM MEMBER</span>
       </div>
     </section>
@@ -900,7 +900,7 @@ export default function ExhibitKiosk() {
       </div>
       <footer className="kiosk-footer">
         <div className="kiosk-footer__actions">
-          <Link className="kiosk-cta kiosk-cta--primary" href="/diagnostics">
+          <Link className="kiosk-cta kiosk-cta--primary" href="/overview">
             EXPLORE THE DASHBOARD <Arrow />
           </Link>
           <a

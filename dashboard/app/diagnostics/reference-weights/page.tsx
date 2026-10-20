@@ -523,7 +523,7 @@ async function fetchWeightModels(): Promise<WeightModelRow[]> {
     const supabase = await createClient();
     const { data: dbModels } = await supabase
       .from("device_model")
-      .select("*")
+      .select("model_id, brand, model_name, device_type, baseline_weight_g, baseline_thickness_mm, nominal_current_ma")
       .order("brand", { ascending: true });
 
     if (!dbModels || dbModels.length === 0) {
@@ -562,15 +562,10 @@ export default async function ReferenceWeightsPage() {
           <div className="rg-titlebar">
             <div>
               <h1>Reference weights</h1>
-              <p className="rg-sub">
-                Diagnostics / Reference weights. Nominal weights used for the weight check. View only, edited by the team.
-              </p>
+              <p className="rg-sub">Diagnostics / Reference weights. Compare readings against phone specifications and add verified reference models for future reviews.</p>
             </div>
 
             <div className="rg-titlebar__actions">
-              <span className="rg-muted" style={{ fontSize: "12.5px", fontWeight: 500 }}>
-                View only
-              </span>
               <Link href="/diagnostics" className="rg-btn">
                 Back to diagnostics
               </Link>

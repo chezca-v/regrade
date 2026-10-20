@@ -1,21 +1,17 @@
 "use client";
 
 import "./globals.css";
-import React, { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { TopNav } from "./components/TopNav";
 import { Pill } from "./components/Pill";
 import { ReadingCard } from "./components/ReadingCard";
 import { CheckIcon, ClockIcon } from "./components/Icons";
-import {
-  STAGES,
-  CURRENT_READINGS,
-  GRADING_RULES,
-  QUEUE,
-} from "@/lib/rg-data";
+import { STAGES, CURRENT_READINGS, GRADING_RULES } from "@/lib/rg-data";
 import { RESULT_COLOR } from "@/lib/rg-helpers";
-import type { Stage, QueueDevice } from "@/lib/rg-types";
+import { createClient } from "@/lib/supabase/client";
+import type { Stage } from "@/lib/rg-types";
 
 type Telemetry = {
   telemetry_id: number;
@@ -30,32 +26,62 @@ type Telemetry = {
   reported_at: string;
 };
 
-type DiagnosticsPageProps = { telemetry: Telemetry[]; telemetryError: boolean };
+type PhoneReference = { model_id: number; brand: string; model_name: string; baseline_weight_g: number; baseline_thickness_mm: number | null };
+type DiagnosticsPageProps = { telemetry: Telemetry[]; telemetryError: boolean; references: PhoneReference[] };
 
-function DeviceIcon() {
-  return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
-      <line x1="12" y1="18" x2="12.01" y2="18" />
-    </svg>
-  );
-}
-
-export function DiagnosticsPage({ telemetry, telemetryError }: DiagnosticsPageProps) {
+export function DiagnosticsPage({ telemetry, telemetryError, references }: DiagnosticsPageProps) {
   const router = useRouter();
-  const [stages] = useState<Stage[]>(STAGES);
-  const [queue] = useState<QueueDevice[]>(QUEUE);
-  const [selectedQueueId, setSelectedQueueId] = useState<string | null>(null);
+  const stages: Stage[] = STAGES;
+  const [activeReport, setActiveReport] = useState<Telemetry | null>(null);
+  const [savedReports, setSavedReports] = useState<number[]>([]);
+  const [referenceId, setReferenceId] = useState("");
+  const [operatorDecision, setOperatorDecision] = useState<"resellable" | "recycle" | "disposal" | "needs-review">("needs-review");
+  const [saveMessage, setSaveMessage] = useState("");
+  const selectedReference = references.find((item) => String(item.model_id) === referenceId);
+
+  useEffect(() => {
+    try {
+      const existing = JSON.parse(localStorage.getItem("regrade-saved-diagnoses-v1") ?? "[]") as Telemetry[];
+      setSavedReports(existing.map((item) => item.telemetry_id));
+    } catch {
+      localStorage.removeItem("regrade-saved-diagnoses-v1");
+    }
+  }, []);
+
+  async function saveReportLocally(report: Telemetry) {
+    setSaveMessage("");
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setSaveMessage("Sign in to save this diagnosis to the shared records.");
+        return;
+      }
+      const { error } = await supabase.from("operator_diagnosis").upsert({
+        telemetry_id: report.telemetry_id,
+        operator_id: user.id,
+        device_model_id: selectedReference?.model_id ?? null,
+        decision: operatorDecision,
+        notes: report.fault,
+      }, { onConflict: "telemetry_id,operator_id" });
+      if (error) throw error;
+      setSavedReports((current) => current.includes(report.telemetry_id) ? current : [...current, report.telemetry_id]);
+      localStorage.setItem("regrade-saved-diagnoses-v1", JSON.stringify([{ ...report }, ...((JSON.parse(localStorage.getItem("regrade-saved-diagnoses-v1") ?? "[]") as Telemetry[]).filter((item) => item.telemetry_id !== report.telemetry_id))]));
+      setSaveMessage("Diagnosis saved to shared records.");
+      return;
+    } catch (error) {
+      setSaveMessage(error instanceof Error ? `${error.message} A browser copy was saved instead.` : "Shared save is unavailable. A browser copy was saved instead.");
+    }
+    try {
+      const key = "regrade-saved-diagnoses-v1";
+      const existing = JSON.parse(localStorage.getItem(key) ?? "[]") as Telemetry[];
+      const next = [report, ...existing.filter((item) => item.telemetry_id !== report.telemetry_id)];
+      localStorage.setItem(key, JSON.stringify(next));
+      setSavedReports((current) => current.includes(report.telemetry_id) ? current : [...current, report.telemetry_id]);
+    } catch {
+      window.alert("This browser could not save the diagnosis copy. The station report remains in Supabase.");
+    }
+  }
 
   return (
     <div className="rg-shell">
@@ -86,7 +112,7 @@ export function DiagnosticsPage({ telemetry, telemetryError }: DiagnosticsPagePr
                         <td>{new Date(record.reported_at).toISOString().replace("T", " ").slice(0, 19)} UTC</td><td>{record.station_id}</td><td>{record.session_id}</td><td>{record.status}</td>
                         <td>{record.grade ?? "—"}</td><td>{record.health_score !== null ? `${record.health_score}%` : "—"}</td>
                         <td>{display("weight_g")}</td><td>{display("thickness_mm")}</td><td>{display("current_ma")}</td><td>{display("surface_temp_c")}</td><td>{display("temperature_rise_c")}</td>
-                        <td><Link href={`/inventory/${encodeURIComponent(record.session_id)}`} className="rg-btn">View</Link></td>
+                        <td><button type="button" className="rg-btn" onClick={() => setActiveReport(record)}>Review result</button></td>
                       </tr>;
                     })}
                   </tbody>
@@ -99,7 +125,7 @@ export function DiagnosticsPage({ telemetry, telemetryError }: DiagnosticsPagePr
             <div>
               <h1>Diagnostics</h1>
               <p className="rg-sub">
-                Current test, grading rules and the device queue. Sample data, no hardware connected.
+                Station reports, grading reference, and the next operator step. No station hardware is connected to this demo.
               </p>
             </div>
             <div className="rg-titlebar__actions">
@@ -109,8 +135,8 @@ export function DiagnosticsPage({ telemetry, telemetryError }: DiagnosticsPagePr
               >
                 View reference weights
               </button>
-              <button className="rg-btn rg-btn--primary">
-                ＋ New diagnostic test
+              <button className="rg-btn rg-btn--primary" disabled title="Connect the ESP32 station before starting a real test.">
+                Station offline
               </button>
             </div>
           </div>
@@ -119,13 +145,13 @@ export function DiagnosticsPage({ telemetry, telemetryError }: DiagnosticsPagePr
           <section className="rg-card rg-card--pad rg-current-test">
             <div className="rg-row rg-row--between rg-current-test__header">
               <div>
-                <h3>Current test</h3>
+                <h3>Single-device test workflow</h3>
                 <p className="rg-small rg-muted">
-                  REG-20261013-008, Smartphone, Model X12 (placeholder). Weight 166 g, 1% under nominal.
+                  One closed phone at a time. Place it on the station and press the physical START button; the report appears above after the station sends it.
                 </p>
               </div>
               <span className="rg-badge rg-badge--neutral">
-                In progress: Electrical check
+                Waiting for station report
               </span>
             </div>
 
@@ -174,15 +200,16 @@ export function DiagnosticsPage({ telemetry, telemetryError }: DiagnosticsPagePr
                 <ReadingCard key={reading.label} reading={reading} />
               ))}
             </div>
+            <p className="rg-small rg-muted">Illustrative sample only. No live scan is in progress.</p>
           </section>
 
-          {/* Bottom split: Grading rules + Device queue */}
-          <div className="rg-diag-split">
+          {/* Grading reference and single-device next step */}
+          <div className="rg-diag-split rg-diag-split--rules-only">
             {/* Left: How each result is graded */}
             <section className="rg-card rg-card--pad rg-diag-split__rules">
               <h3>How each result is graded</h3>
               <p className="rg-small rg-muted">
-                The diagnostic result follows these limits. An operator verifies it before routing.
+                The diagnostic result is a screening guide. An operator reviews each single-device result.
               </p>
 
               <div className="rg-table-wrap">
@@ -194,7 +221,6 @@ export function DiagnosticsPage({ telemetry, telemetryError }: DiagnosticsPagePr
                       <th>Casing swell</th>
                       <th>Temp rise</th>
                       <th>Charging draw</th>
-                      <th>Bin</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -212,7 +238,6 @@ export function DiagnosticsPage({ telemetry, telemetryError }: DiagnosticsPagePr
                           <td>{rule.swell}</td>
                           <td>{rule.tempRise}</td>
                           <td>{rule.chargeDraw}</td>
-                          <td className="rg-bin-cell">{rule.bin}</td>
                         </tr>
                       );
                     })}
@@ -223,55 +248,79 @@ export function DiagnosticsPage({ telemetry, telemetryError }: DiagnosticsPagePr
               <p className="rg-rules-footnote">
                 Battery ESR limits are placeholders until the team confirms them.
               </p>
-            </section>
-
-            {/* Right: Device queue */}
-            <section className="rg-card rg-card--pad rg-diag-split__queue">
-              <div className="rg-row rg-row--between">
-                <div>
-                  <h3>Device queue</h3>
-                  <p className="rg-small rg-muted">
-                    {queue.length} devices waiting for a test
-                  </p>
-                </div>
-              </div>
-
-              <div className="rg-queue-list" role="list">
-                {queue.map((item) => {
-                  const isSelected = selectedQueueId === item.id;
-                  return (
-                    <div
-                      key={item.id}
-                      role="listitem"
-                      tabIndex={0}
-                      className={`rg-queue-item${
-                        isSelected ? " rg-queue-item--selected" : ""
-                      }`}
-                      onClick={() => setSelectedQueueId(item.id)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          setSelectedQueueId(item.id);
-                        }
-                      }}
-                    >
-                      <div className="rg-queue-item__icon">
-                        <DeviceIcon />
-                      </div>
-                      <div className="rg-queue-item__info">
-                        <strong>{item.id}</strong>
-                        <span>{item.model}</span>
-                      </div>
-                      <span className="rg-badge rg-badge--neutral">
-                        Waiting
-                      </span>
-                    </div>
-                  );
-                })}
+              <div className="rg-next-step-note">
+                <strong>Next: complete one scan at the station</strong>
+                <span>Place one closed phone on the bed, press the physical START button, then review the result in Latest station readings. Any station fault is surfaced with that result.</span>
+                <button className="rg-btn" type="button" onClick={() => router.push("/diagnostics/reference-weights")}>Compare with phone references</button>
               </div>
             </section>
+
+
           </div>
         </div>
       </main>
+      {activeReport && (
+        <div className="rg-modal-backdrop" role="presentation" onClick={() => setActiveReport(null)}>
+          <section className="rg-modal rg-result-modal" role="dialog" aria-modal="true" aria-labelledby="diagnostic-result-heading" onClick={(event) => event.stopPropagation()}>
+            <div className="rg-row rg-row--between">
+              <div>
+                <h2 id="diagnostic-result-heading">Scan result</h2>
+                <p className="rg-modal__sub">Session {activeReport.session_id} · {new Date(activeReport.reported_at).toLocaleString()}</p>
+              </div>
+              <button className="rg-btn" type="button" onClick={() => setActiveReport(null)}>Close</button>
+            </div>
+            {(activeReport.grade === "D" || activeReport.fault) && (
+              <div className="rg-alert-banner rg-result-warning" role="alert">
+                <strong>Station safety flag</strong>
+                <span>{activeReport.fault ?? "Grade D reported. Stop handling and follow the approved safety procedure."}</span>
+              </div>
+            )}
+            <div className="rg-result-summary">
+              <div><span>Station status</span><strong>{activeReport.status}</strong></div>
+              <div><span>Grade</span><strong>{activeReport.grade ?? "Not reported"}</strong></div>
+              <div><span>Health score</span><strong>{activeReport.health_score === null ? "Not reported" : `${activeReport.health_score}%`}</strong></div>
+              <div><span>Device identification</span><strong>Brand and model not sent by station</strong></div>
+            </div>
+            <h3>Measured readings</h3>
+            <div className="rg-result-readings">
+              {activeReport.readings && typeof activeReport.readings === "object" && !Array.isArray(activeReport.readings) ? Object.entries(activeReport.readings).map(([key, value]) => (
+                <div key={key}><span>{key.replaceAll("_", " ")}</span><strong>{typeof value === "number" || typeof value === "string" ? value : "Not reported"}</strong></div>
+              )) : <p className="rg-small rg-muted">No readings were included in this station report.</p>}
+            </div>
+            <div className="rg-reference-compare">
+              <label htmlFor="scan-reference-model"><strong>Compare with a healthy phone reference</strong></label>
+              <select id="scan-reference-model" value={referenceId} onChange={(event) => setReferenceId(event.target.value)}>
+                <option value="">Select brand and model</option>
+                {references.map((item) => <option key={item.model_id} value={item.model_id}>{item.brand} {item.model_name}</option>)}
+              </select>
+              {selectedReference && (() => {
+                const readings = activeReport.readings && typeof activeReport.readings === "object" && !Array.isArray(activeReport.readings) ? activeReport.readings as Record<string, import("@/lib/database.types").Json | undefined> : {};
+                const measuredWeight = typeof readings.weight_g === "number" ? readings.weight_g : null;
+                const measuredThickness = typeof readings.thickness_mm === "number" ? readings.thickness_mm : null;
+                return <div className="rg-reference-compare__values">
+                  <span>Weight: scanned {measuredWeight === null ? "not reported" : `${measuredWeight} g`} · reference {selectedReference.baseline_weight_g} g</span>
+                  <span>Thickness: scanned {measuredThickness === null ? "not reported" : `${measuredThickness} mm`} · reference {selectedReference.baseline_thickness_mm == null ? "not recorded" : `${selectedReference.baseline_thickness_mm} mm`}</span>
+                </div>;
+              })()}
+              <p className="rg-small rg-muted">Brand and model are operator-selected; the station does not identify phones automatically.</p>
+            </div>
+            <label className="rg-decision-select">Operator disposition
+              <select value={operatorDecision} onChange={(event) => setOperatorDecision(event.target.value as typeof operatorDecision)}>
+                <option value="needs-review">Needs more review</option>
+                <option value="resellable">Suitable for reuse review</option>
+                <option value="recycle">Recycle / safe dismantling review</option>
+                <option value="disposal">Disposal review</option>
+              </select>
+            </label>
+            <p className="rg-small rg-muted">The station report is stored in Supabase. Save a reviewed operator disposition with the selected model reference. Results are screening indicators and do not confirm battery safety.</p>
+            {saveMessage && <p className="rg-small" role="status">{saveMessage} {saveMessage.startsWith("Sign in") && <Link href="/login">Sign in</Link>}</p>}
+            <div className="rg-modal__actions">
+              <button className="rg-btn" type="button" onClick={() => router.push("/diagnostics/reference-weights")}>Compare phone references</button>
+              <button className="rg-btn rg-btn--primary" type="button" onClick={() => void saveReportLocally(activeReport)}>{savedReports.includes(activeReport.telemetry_id) ? "Diagnosis saved" : "Save diagnosis"}</button>
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   );
 }

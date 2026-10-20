@@ -1,334 +1,58 @@
 import Link from "next/link";
-import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
+import { TopNav } from "@/app/components/TopNav";
 
 interface PageProps {
   params: Promise<{ id: string }>;
 }
 
-// --- Icons ---
-function BrandMarkIcon() {
-  return (
-    <div
-      style={{
-        width: 36,
-        height: 36,
-        borderRadius: 9,
-        backgroundColor: "#ffffff",
-        border: "1px solid #dde5e0",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        overflow: "hidden",
-        flexShrink: 0,
-        boxShadow: "0 1px 3px rgba(22, 45, 33, 0.08)",
-      }}
-    >
-      <Image
-        src="/logo.png"
-        alt="ReGrade logo"
-        width={36}
-        height={36}
-        style={{ width: "100%", height: "100%", objectFit: "contain" }}
-        priority
-      />
-    </div>
-  );
-}
-
-function BellIcon() {
-  return (
-    <svg
-      width="20"
-      height="20"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="#55645c"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-      <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-    </svg>
-  );
-}
-
-function SlidersIcon() {
-  return (
-    <svg
-      width="20"
-      height="20"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="#55645c"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <line x1="4" y1="21" x2="4" y2="14" />
-      <line x1="4" y1="10" x2="4" y2="3" />
-      <line x1="12" y1="21" x2="12" y2="12" />
-      <line x1="12" y1="8" x2="12" y2="3" />
-      <line x1="20" y1="21" x2="20" y2="16" />
-      <line x1="20" y1="12" x2="20" y2="3" />
-      <line x1="1" y1="14" x2="7" y2="14" />
-      <line x1="9" y1="8" x2="15" y2="8" />
-      <line x1="17" y1="16" x2="23" y2="16" />
-    </svg>
-  );
-}
-
-function WarningTriangleIcon({ className = "w-4 h-4 text-[#dc2626]" }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-      <line x1="12" y1="9" x2="12" y2="13" />
-      <line x1="12" y1="17" x2="12.01" y2="17" />
-    </svg>
-  );
-}
-
-function GreenCheckIcon() {
-  return (
-    <svg
-      width="15"
-      height="15"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="#16a34a"
-      strokeWidth="2.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <polyline points="20 6 9 17 4 12" />
-    </svg>
-  );
-}
-
-function ClockIcon() {
-  return (
-    <svg
-      width="15"
-      height="15"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="#718077"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <circle cx="12" cy="12" r="10" />
-      <polyline points="12 6 12 12 16 14" />
-    </svg>
-  );
-}
-
-// --- Dynamic Data Loader ---
 async function fetchDeviceDetails(deviceId: string) {
-  // Default values matching the design mock for REG-20261013-004
-  const defaultData = {
-    isLive: false,
-    deviceId: deviceId || "REG-20261013-004",
-    deviceType: "Smartphone",
-    modelName: "Model X14 (placeholder)",
-    testTime: "13:57",
-    hasSafetyAlert: true,
-    alertTitle: "Safety alert: battery swelling on this device",
-    alertSubtext: "Wear gloves and move the device to the quarantine shelf. Do not charge it.",
-    completedTime: "13:57",
-    fullReadingsSubtitle: "All four readings are outside their limits.",
+  const fallback = {
+    isLive: false, deviceId, deviceType: "Phone", modelName: "Sample phone record", testTime: "—",
+    hasSafetyAlert: false, alertTitle: "", alertSubtext: "", completedTime: "Sample only",
+    fullReadingsSubtitle: "Example inventory record; this is not a live scan.",
     metrics: {
-      batteryEsr: {
-        label: "Battery ESR",
-        value: "412",
-        unit: "mΩ",
-        limitText: "Limit 250 mΩ",
-        statusText: "Over limit",
-        isAlert: true,
-      },
-      powerDraw: {
-        label: "Power draw",
-        value: "980",
-        unit: "mA",
-        limitText: "Range 500 to 800 mA",
-        statusText: "Above range",
-        isAlert: true,
-      },
-      tempRise: {
-        label: "Temperature rise",
-        value: "16.2",
-        unit: "°C",
-        limitText: "Limit 15 °C",
-        statusText: "Over limit",
-        isAlert: true,
-      },
-      casingSwell: {
-        label: "Casing swell",
-        value: "4.1",
-        unit: "mm",
-        limitText: "Hazard above 3.5 mm",
-        statusText: "Over hazard limit",
-        isAlert: true,
-      },
+      batteryEsr: { label: "Battery ESR", value: "—", unit: "mΩ", limitText: "Not reported", statusText: "Not reported" },
+      powerDraw: { label: "Power draw", value: "—", unit: "mA", limitText: "Not reported", statusText: "Not reported" },
+      tempRise: { label: "Temperature rise", value: "—", unit: "°C", limitText: "Not reported", statusText: "Not reported" },
+      casingSwell: { label: "Thickness", value: "—", unit: "mm", limitText: "Not reported", statusText: "Not reported" },
     },
-    whyReasons: [
-      "Casing swell is 4.1 mm. The hazard limit is 3.5 mm.",
-      "Temperature rise is 16.2 °C. The limit is 15 °C.",
-      "Battery ESR is 412 mΩ, above the 250 mΩ placeholder limit.",
-      "Power draw is 980 mA, above the expected 500 to 800 mA range.",
-    ],
-    activity: [
-      { label: "Scan completed", time: "13:52", type: "completed" },
-      { label: "Electrical check completed", time: "13:54", type: "completed" },
-      { label: "Graded as Disposal", time: "13:57", type: "completed" },
-      { label: "Safety alert raised", time: "13:57", type: "alert" },
-      { label: "Waiting for operator verification", time: "Now", type: "pending" },
-    ],
-    diagnosticResult: "Disposal",
-    diagnosticResultDescription:
-      "Heavy casing swelling and a thermal rise. Suggested destination is Bin C.",
-    processingDecision: "Awaiting verification",
-    processingDecisionSubtitle:
-      "Not yet verified. Confirm to route to Bin C, or override with a reason.",
-    info: {
-      deviceType: "Smartphone",
-      model: "Model X14 (placeholder)",
-      nominalWeight: "174 g",
-      measuredWeight: "171 g",
-      intakeBatch: "BATCH-1013-A",
-      received: "13 Oct 2026, 13:49",
-      collectionCenter: "Sample recycling center",
-    },
+    whyReasons: ["This sample inventory row does not contain station telemetry."],
+    activity: [{ label: "Sample record", time: "—", type: "pending" as const }],
+    diagnosticResult: "Not available", diagnosticResultDescription: "No station result is associated with this sample record.",
+    processingDecision: "No operator review", processingDecisionSubtitle: "Use Diagnostics to review real station reports.",
+    info: { deviceType: "Phone", model: "Not recorded", nominalWeight: "Not recorded", measuredWeight: "Not recorded", intakeBatch: "Not recorded", received: "Not recorded", collectionCenter: "Not recorded" },
   };
-
-  // Attempt database query if Supabase credentials are configured
-  if (
-    !process.env.NEXT_PUBLIC_SUPABASE_URL ||
-    !process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
-  ) {
-    return defaultData;
-  }
-
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY) return fallback;
   try {
     const supabase = await createClient();
-
-    // The device ID in the URL is the station-generated session_id
-    // (e.g. "REGRADE-01-aabbccdd-11223344"). Inventory rows in the mock
-    // audit log use a different, human-readable ID scheme and will not
-    // match any real session until a station reports under that ID.
-    const { data: telemetry } = await supabase
-      .from("station_telemetry")
-      .select(
-        "telemetry_id, station_id, session_id, status, duration_ms, readings, grade, health_score, fault, reported_at",
-      )
-      .eq("session_id", deviceId)
-      .order("reported_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (!telemetry) {
-      return defaultData;
-    }
-
-    const readings: Record<string, number | null> =
-      telemetry.readings && typeof telemetry.readings === "object" && !Array.isArray(telemetry.readings)
-        ? (telemetry.readings as Record<string, number | null>)
-        : {};
-
-    const formatTime = (isoString?: string | null) => {
-      if (!isoString) return defaultData.testTime;
-      const d = new Date(isoString);
-      return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-    };
-    const timeStr = formatTime(telemetry.reported_at);
-
-    const isGraded = telemetry.status === "graded" && telemetry.grade !== null;
-    const isHazard = telemetry.grade === "D";
-
-    const mappedResult = !isGraded
-      ? telemetry.status
-      : telemetry.grade === "D"
-        ? "Disposal"
-        : telemetry.grade === "C"
-          ? "Recycle / Safe Dismantling"
-          : "Resellable / Refurbishable";
-
-    const metricFromReading = (key: string, unit: string, label: string) => {
-      const value = readings[key];
-      return {
-        label,
-        value: typeof value === "number" ? value.toFixed(2) : "—",
-        unit,
-        limitText: "No per-reading limit is persisted for this station report",
-        statusText: isHazard ? "Flagged" : "Recorded",
-        isAlert: isHazard,
-      };
-    };
-
+    const { data: report } = await supabase.from("station_telemetry")
+      .select("station_id, session_id, status, readings, grade, health_score, fault, reported_at")
+      .eq("session_id", deviceId).order("reported_at", { ascending: false }).limit(1).maybeSingle();
+    if (!report) return fallback;
+    const readings = report.readings && typeof report.readings === "object" && !Array.isArray(report.readings) ? report.readings as Record<string, number | string | null> : {};
+    const value = (key: string) => typeof readings[key] === "number" ? Number(readings[key]).toFixed(1) : "—";
+    const grade = report.grade;
+    const result = grade === "D" ? "Safety review required" : grade === "C" ? "Recycle review" : grade ? "Reuse review" : "Not graded";
+    const recorded = new Date(report.reported_at).toISOString().replace("T", " ").slice(0, 16) + " UTC";
     return {
-      isLive: true,
-      deviceId,
-      deviceType: "Not recorded by firmware",
-      modelName: "Not recorded by firmware",
-      testTime: timeStr,
-      hasSafetyAlert: isHazard,
-      alertTitle: "Safety alert: station flagged this device as a hazard",
-      alertSubtext: "Wear gloves and move the device to the quarantine shelf. Do not charge it.",
-      completedTime: timeStr,
-      fullReadingsSubtitle: telemetry.fault
-        ? `Reported fault: ${telemetry.fault}`
-        : "Readings from the latest station report for this session.",
+      ...fallback, isLive: true, deviceId: report.session_id, deviceType: "Not identified by station", modelName: "Not identified by station",
+      testTime: recorded.slice(11, 16), completedTime: recorded, fullReadingsSubtitle: report.fault ?? "Station report received.",
+      hasSafetyAlert: grade === "D" || Boolean(report.fault), alertTitle: "Station safety flag", alertSubtext: report.fault ?? "Grade D: follow the approved safety procedure.",
       metrics: {
-        batteryEsr: metricFromReading("weight_g", "g", "Weight"),
-        powerDraw: metricFromReading("current_ma", "mA", "Charging current"),
-        tempRise: metricFromReading("temperature_rise_c", "°C", "Temperature rise"),
-        casingSwell: metricFromReading("thickness_mm", "mm", "Thickness"),
+        batteryEsr: { label: "Battery ESR", value: "—", unit: "mΩ", limitText: "Not reported by station", statusText: "Not reported" },
+        powerDraw: { label: "Charging current", value: value("current_ma"), unit: "mA", limitText: "See diagnostic rules", statusText: "Recorded" },
+        tempRise: { label: "Temperature rise", value: value("temperature_rise_c"), unit: "°C", limitText: "See diagnostic rules", statusText: "Recorded" },
+        casingSwell: { label: "Thickness", value: value("thickness_mm"), unit: "mm", limitText: "Compare with selected phone reference", statusText: "Recorded" },
       },
-      whyReasons: isGraded
-        ? [
-            `Graded ${telemetry.grade}${
-              telemetry.health_score !== null ? ` with a health score of ${telemetry.health_score}%` : ""
-            }. Per-check thresholds are not persisted by the current telemetry schema.`,
-          ]
-        : [
-            `Session status: ${telemetry.status}.${telemetry.fault ? ` ${telemetry.fault}.` : ""} No grade was produced.`,
-          ],
-      activity: [
-        { label: "Station report received", time: timeStr, type: "completed" as const },
-        ...(isHazard ? [{ label: "Safety alert raised", time: timeStr, type: "alert" as const }] : []),
-      ],
-      diagnosticResult: mappedResult,
-      diagnosticResultDescription: !isGraded
-        ? "This session has not produced a grade yet."
-        : isHazard
-          ? "One or more readings triggered a hazard grade. Route to the disposal bin."
-          : "Device within the automated grading rule's accepted range.",
-      processingDecision: "Awaiting verification",
-      processingDecisionSubtitle: isGraded
-        ? "Not yet verified. Confirm the result, or override with a reason."
-        : "No grade is available to verify yet.",
-      info: {
-        deviceType: "Not recorded by firmware",
-        model: "Not recorded by firmware",
-        nominalWeight: "Not recorded",
-        measuredWeight:
-          typeof readings["weight_g"] === "number" ? `${readings["weight_g"].toFixed(1)} g` : "Not recorded",
-        intakeBatch: "Not recorded",
-        received: new Date(telemetry.reported_at).toISOString().replace("T", " ").slice(0, 16) + " UTC",
-        collectionCenter: "Not recorded",
-      },
+      whyReasons: [report.fault ?? `Station grade ${grade ?? "not reported"}${report.health_score === null ? "" : ` · health score ${report.health_score}%`}. Review readings before deciding.`],
+      activity: [{ label: "Station report received", time: recorded, type: "completed" as const }],
+      diagnosticResult: result, diagnosticResultDescription: "Review the full station readings in Diagnostics before recording an operator disposition.",
+      processingDecision: "Review in Diagnostics", processingDecisionSubtitle: "The operator disposition is recorded in the scan result review.",
+      info: { deviceType: "Not identified by station", model: "Not identified by station", nominalWeight: "Select a reference in Diagnostics", measuredWeight: value("weight_g") === "—" ? "Not recorded" : `${value("weight_g")} g`, intakeBatch: report.station_id, received: recorded, collectionCenter: "Not recorded" },
     };
   } catch {
-    return defaultData;
+    return fallback;
   }
 }
 
@@ -339,90 +63,7 @@ export default async function DeviceDetailPage({ params }: PageProps) {
 
   return (
     <div className="min-h-screen bg-[#f3f5f3] text-[#15271f] font-sans antialiased pb-16">
-      {/* 1. TOP NAVIGATION */}
-      <header className="w-full bg-[#f3f5f3] pt-4 px-6 md:px-10 max-w-[1440px] mx-auto">
-        <div className="flex items-center justify-between gap-4">
-          {/* Logo & Subtitle */}
-          <Link href="/overview" className="flex items-center gap-3 no-underline">
-            <BrandMarkIcon />
-            <div>
-              <div className="font-extrabold text-[17px] text-[#15271f] tracking-tight leading-none">
-                ReGrade
-              </div>
-              <div className="text-[10px] text-[#86948d] font-medium tracking-normal mt-1 leading-none">
-                E-waste diagnostics
-              </div>
-            </div>
-          </Link>
-
-          {/* Center Links (Pill Container) */}
-          <nav className="hidden lg:flex items-center bg-white rounded-full px-2 py-1 shadow-[0_1px_4px_rgba(0,0,0,0.04)] border border-[#e8ece9]">
-            <Link
-              href="/"
-              className="px-4 py-1.5 text-[13px] font-medium text-[#46564e] hover:text-[#15271f] transition-colors rounded-full"
-            >
-              Overview
-            </Link>
-            <Link
-              href="/#diagnostics"
-              className="px-4 py-1.5 text-[13px] font-medium text-[#46564e] hover:text-[#15271f] transition-colors rounded-full"
-            >
-              Diagnostics
-            </Link>
-            <Link
-              href="/inventory"
-              className="px-4 py-1.5 text-[13px] font-medium text-white bg-[#163d2d] rounded-full shadow-xs"
-            >
-              Inventory
-            </Link>
-            <Link
-              href="/#sorting"
-              className="px-4 py-1.5 text-[13px] font-medium text-[#46564e] hover:text-[#15271f] transition-colors rounded-full"
-            >
-              Sorting
-            </Link>
-            <Link
-              href="/#safety-alerts"
-              className="px-4 py-1.5 text-[13px] font-medium text-[#46564e] hover:text-[#15271f] transition-colors rounded-full flex items-center gap-1"
-            >
-              Safety alerts{" "}
-              <span className="text-[#dc2626] font-semibold text-[13px] ml-0.5">2</span>
-            </Link>
-            <Link
-              href="/#reports"
-              className="px-4 py-1.5 text-[13px] font-medium text-[#46564e] hover:text-[#15271f] transition-colors rounded-full"
-            >
-              Reports
-            </Link>
-          </nav>
-
-          {/* Right Actions */}
-          <div className="flex items-center gap-3.5">
-            <button
-              type="button"
-              className="p-1.5 rounded-full hover:bg-black/5 text-[#55645c] transition-colors"
-              aria-label="Notifications"
-            >
-              <BellIcon />
-            </button>
-            <button
-              type="button"
-              className="p-1.5 rounded-full hover:bg-black/5 text-[#55645c] transition-colors"
-              aria-label="Settings and Filters"
-            >
-              <SlidersIcon />
-            </button>
-            <div
-              className="w-8 h-8 rounded-full bg-[#dcf0e4] text-[#194b36] font-bold text-[11px] flex items-center justify-center tracking-wider cursor-pointer select-none"
-              title="Operator Profile"
-            >
-              OP
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Container */}
+      <TopNav />
       <main className="w-full px-6 md:px-10 max-w-[1440px] mx-auto mt-7">
         {/* 2. PAGE HEADER & ACTIONS */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -695,45 +336,6 @@ export default async function DeviceDetailPage({ params }: PageProps) {
                 </div>
               </div>
 
-              {/* Bottom section (Gray background): Processing decision */}
-              <div className="px-6 pb-6">
-                <div className="rounded-xl p-4 bg-[#f5f8f6] border border-[#e5ebe7]">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[13px] font-bold text-[#15271f]">
-                      Processing decision
-                    </span>
-                    <span className="text-[11px] text-[#718077] font-medium">
-                      Needs operator
-                    </span>
-                  </div>
-
-                  <div className="my-2.5">
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-[#fef6e5] text-[#b45309]">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#d97706]" />
-                      {data.processingDecision}
-                    </span>
-                  </div>
-
-                  <p className="text-[12px] text-[#55665d] leading-snug mb-3.5">
-                    {data.processingDecisionSubtitle}
-                  </p>
-
-                  <div className="flex items-center gap-2.5">
-                    <button
-                      type="button"
-                      className="bg-[#246e4c] hover:bg-[#1d5c3f] text-white text-[12px] font-semibold px-4 py-2 rounded-lg shadow-sm transition-colors cursor-pointer"
-                    >
-                      Verify and route
-                    </button>
-                    <button
-                      type="button"
-                      className="bg-white border border-[#d9e0db] hover:bg-[#f9faf9] text-[#2c3d34] text-[12px] font-semibold px-4 py-2 rounded-lg shadow-[0_1px_2px_rgba(0,0,0,0.02)] transition-colors cursor-pointer"
-                    >
-                      Override
-                    </button>
-                  </div>
-                </div>
-              </div>
             </div>
 
             {/* Device info Card */}
@@ -777,12 +379,6 @@ export default async function DeviceDetailPage({ params }: PageProps) {
                   <span className="text-[12px] text-[#718077]">Received</span>
                   <span className="text-[12px] font-bold text-[#15271f]">
                     {data.info.received}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between py-2.5">
-                  <span className="text-[12px] text-[#718077]">Collection center</span>
-                  <span className="text-[12px] font-bold text-[#15271f]">
-                    {data.info.collectionCenter}
                   </span>
                 </div>
               </div>
