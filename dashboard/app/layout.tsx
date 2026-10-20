@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "ReGrade | Triage dashboard",
+  title: "ReGrade | E-waste triage prototype",
   description:
-    "Monitor e-waste diagnostics and inventory from ReGrade test stations.",
+    "Explore ReGrade, a non-destructive smartphone and USB charger triage prototype.",
   icons: {
     icon: "/logo.png",
     shortcut: "/logo.png",

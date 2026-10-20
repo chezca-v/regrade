@@ -414,9 +414,18 @@ Distributed under the MIT License. See [LICENSE](LICENSE) for details.
 
 ## 👩‍💻 Meet the Team
 
-| Team Member | Role                                              |
-| ----------- | ------------------------------------------------- |
-| Cessa       | Introduction, problem statement, and target scope |
-| Lena        | Non-destructive hardware methodology              |
+The ReGrade exhibit introduces each project member in an automatically rotating
+spotlight. Team portraits will be added when they are available.
 
-<!-- Add team members and roles as the project team is finalized. -->
+| Team Member | Project Role |
+| --- | --- |
+| Franchezca Natividad Z. Banayad | Project Lead & Full-Stack / Systems Engineer |
+| Carl Andrew S. Dela Cruz | Hardware Procurement & Assembly Lead |
+| Niña Ysabelle C. Frigillana | Frontend Developer & Exhibit Design Lead |
+| Elena Vale F. Lanuza | UI/UX & Brand Identity Lead |
+| Princess Mae V. Sanchez | Hardware Fabrication & Frontend Developer |
+
+The autoplay exhibit also invites visitors to choose an in-person activity: discuss
+donating an unused phone or request a phone consultation with the team. The kiosk
+does not collect contact details or donations; visitors can speak with a team member
+at the exhibit table.
