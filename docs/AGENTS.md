@@ -17,6 +17,10 @@ guidance in [`../CLAUDE.md`](../CLAUDE.md) as well.
 - Treat `supabase/migrations/` as the canonical schema. Keep the ERD,
   architecture, and README aligned when entities, relationships, access
   policies, or data flows change.
+- Keep [`OUTSTANDING_WORK.md`](OUTSTANDING_WORK.md) current when a tracked gap
+  closes or a new one is found. It is the single list of what's not done yet;
+  don't let implementation-status claims drift from it the way the old
+  "Implementation History" section below once did.
 - Preserve safety boundaries: no manual battery disassembly, no unreviewed
   electrical stimulus, and no unvalidated automatic sorting.
 
@@ -44,44 +48,73 @@ guidance in [`../CLAUDE.md`](../CLAUDE.md) as well.
 
 ## Implementation History: Dashboard Screens & Routes
 
-The following dashboard screens and routes have been implemented in `dashboard/` with pixel-perfect layouts, responsive design, and live Supabase integration:
+The following dashboard screens and routes have pixel-perfect layouts and
+responsive design in `dashboard/`. Only **Diagnostics** and **Reference
+Weights** read live Supabase data; the rest render from local mock state
+(`dashboard/lib/rg-data.ts` or inline constants) and say so in their page
+copy ("Sample data"). An earlier version of this section claimed live
+Supabase wiring for Inventory, Device Detail, and Sorting; that was
+aspirational and did not match the code, since the normalized schema those
+pages queried (`test_session`, `sensor_reading`, `grade_result`,
+`sort_action`, `alert`, `grading_rule_set`) had no writer and was dropped in
+migration `20261020020000`. Keep this list honest as screens change.
 
-1. **Inventory Dashboard (`/inventory`)**:
-   - Location: `dashboard/app/inventory/page.tsx` (re-exported via `dashboard/inventory.tsx`).
+1. **Diagnostics Screen (`/diagnostics`)**:
+   - Location: `dashboard/app/diagnostics/page.tsx` (Server Component) +
+     `dashboard/app/diagnostics.tsx` (presentational).
+   - "Latest station readings" table is live: it queries `station_telemetry`
+     (including `grade` and `health_score`) ordered by `reported_at`. The rest
+     of the page (current test stepper, grading-rules reference table, device
+     queue) is still local mock state.
+
+2. **Inventory Dashboard (`/inventory`)**:
+   - Location: `dashboard/app/inventory/page.tsx` (re-exported via
+     `dashboard/app/inventory.tsx`). Entirely local mock state
+     (`INVENTORY_DATA`); not wired to Supabase.
    - Summary KPI cards (*Devices on record*, *Awaiting verification*, *Resellable / Refurbishable*, *Disposal*).
    - Dynamic audit log data table with segmented filtering tabs (*All devices*, *Resellable*, *Recycle*, *Disposal*, *Needs verification*), search by device ID, and time range selection.
    - Row-level alert indicators with warning background highlights for disposal devices (e.g., `REG-20261013-004`).
    - Row click navigation routing directly to the corresponding Device Detail page.
 
-2. **Device Detail Screen (`/inventory/[id]`)**:
+3. **Device Detail Screen (`/inventory/[id]`)**:
    - Location: `dashboard/app/inventory/[id]/page.tsx`.
-   - Dynamic Server Component fetching live triage records, sensor readings, grading rules, and alerts from Supabase using the URL parameter.
-   - Safety Alert banner with glove handling and quarantine instructions.
-   - Full sensor readings grid (Battery ESR, Power draw, Temperature rise, Casing swell) with limit bars and warning statuses.
-   - "Why this result" rule violation explanation and chronological activity timeline.
-   - Decision card with suggested bin routing and operator action controls.
-   - Device metadata specifications card (model, nominal/measured weight, batch, received timestamp, collection center).
+   - Server Component that queries `station_telemetry` by `session_id` (the
+     URL parameter). Inventory's mock row IDs (e.g. `REG-20261013-004`) do not
+     match real firmware-generated session IDs, so navigating from the mock
+     Inventory list will show the placeholder fallback until a real session
+     uses that exact ID; this is expected given Inventory itself is still mock.
+   - Only fields the firmware actually reports are shown: `status`, `grade`,
+     `health_score`, `fault`, and the four `readings` values. There is no
+     stored device model, per-check threshold flags, bin, or activity
+     timeline for a telemetry row, so those sections render honestly reduced
+     content (e.g. "No per-reading limit is persisted for this station
+     report") instead of fabricated values.
+   - Safety Alert banner shown only when `grade = 'D'`.
 
-3. **Sorting Screen (`/sorting`)**:
-   - Location: `dashboard/app/sorting/page.tsx`.
-   - Server Component displaying 3-column bin capacity cards (Bin A Resellable, Bin B Recycle, Bin C Disposal) with dynamic progress bars, collection schedules, and hazard alerts.
-   - Routing queue data table showing devices awaiting verification.
-   - Server Actions (`verifyAndRouteAction` and `overrideAction`) to record operator decisions and sort actions in Supabase with path revalidation.
+4. **Sorting Screen (`/sorting`)**:
+   - Location: `dashboard/app/sorting/page.tsx` (re-exported via
+     `dashboard/app/sorting.tsx`). Entirely local mock state (`"use client"`,
+     `useState`); not wired to Supabase. There are no Server Actions and no
+     `sort_action` table (dropped in `20261020020000`) — operator "Verify and
+     route" / "Override" actions here only mutate component state and are
+     lost on refresh.
 
-4. **Reference Weights Screen (`/diagnostics/reference-weights`)**:
+5. **Reference Weights Screen (`/diagnostics/reference-weights`)**:
    - Location: `dashboard/app/diagnostics/reference-weights/page.tsx` & `table-client.tsx`.
    - Diagnostics Server Component fetching device model specifications from `device_model`.
    - Dynamic threshold calculations for accepted tolerance (±5% nominal) and recycle thresholds (< −15% nominal).
    - Brand filtering dropdown and model search with responsive table pagination.
 
-5. **Settings Screen (`/settings`)**:
-   - Location: `dashboard/app/settings/page.tsx`.
+6. **Settings Screen (`/settings`)**:
+   - Location: `dashboard/app/settings/page.tsx`. Entirely local mock state;
+     not wired to Supabase, and its own copy says so ("Sample data mode",
+     "Not connected").
    - Active settings icon navigation in the top action bar.
    - Interactive notification toggles (safety alert pop-ups, disposal sounds, verification reminders, daily summaries).
    - Display configuration dropdowns (weight units, temperature units, time format, language).
    - Data source card with sample mode toggle and read-only grading limits reference.
 
-6. **Diagnostics Reference Weights & Phone Model Seeding**:
+7. **Diagnostics Reference Weights & Phone Model Seeding**:
    - Ingested and normalized verified mobile phone specifications from the GSMArena dataset (`arwinneil/gsmarena-phone-dataset`) and 2020–2025 Mobiles Dataset (`abdulmalik1518/mobiles-dataset-2025`).
    - Generated database migration `supabase/migrations/20261015170000_seed_phone_reference_weights.sql` and `supabase/seed.sql` populating `public.device_model` with 7,767 unique verified smartphone models with baseline weights (`baseline_weight_g`), physical thickness (`baseline_thickness_mm`), and `ON CONFLICT (brand, model_name, device_type)` upserts.
    - Updated the Reference Weights screen (`dashboard/app/diagnostics/reference-weights/page.tsx` & `table-client.tsx`) to display 52 curated authentic smartphones (Apple iPhone 16/15/14/13/12/11/SE, Samsung Galaxy S24/S23/S22/A54/A34/Z Flip, Google Pixel 9/8/7/6, OnePlus 12/11, Xiaomi 14, Motorola Edge, Sony Xperia) with exact nominal weights and calculated tolerance ranges (accepted ±5%, recycle <85%).

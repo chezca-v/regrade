@@ -213,10 +213,28 @@ bool scanSensors() {
 }
 
 bool loadThresholds(GradingThresholds& loadedThresholds) {
-  // TODO: Load an approved, versioned rule set for the selected device model.
-  // Never infer missing thresholds or silently substitute arbitrary defaults.
-  (void)loadedThresholds;
-  return false;
+  // Fail closed until the team has deliberately reviewed and approved a rule
+  // set in regrade_config.h. Never infer missing thresholds or silently
+  // substitute arbitrary defaults: GRADING_RULES_APPROVED must be set true,
+  // and every threshold must be explicitly non-zero, before this returns one.
+  if (!config::GRADING_RULES_APPROVED ||
+      config::GRADING_MINIMUM_WEIGHT_G <= 0.0F ||
+      config::GRADING_BASELINE_THICKNESS_MM <= 0.0F ||
+      config::GRADING_SWELLING_MM <= 0.0F ||
+      config::GRADING_ZERO_CURRENT_MA <= 0.0F ||
+      config::GRADING_OVERCURRENT_MA <= 0.0F ||
+      config::GRADING_TEMPERATURE_RISE_C <= 0.0F) {
+    return false;
+  }
+
+  loadedThresholds.minimumWeightG = config::GRADING_MINIMUM_WEIGHT_G;
+  loadedThresholds.baselineThicknessMm = config::GRADING_BASELINE_THICKNESS_MM;
+  loadedThresholds.swellingMm = config::GRADING_SWELLING_MM;
+  loadedThresholds.zeroCurrentMa = config::GRADING_ZERO_CURRENT_MA;
+  loadedThresholds.overcurrentMa = config::GRADING_OVERCURRENT_MA;
+  loadedThresholds.temperatureRiseC = config::GRADING_TEMPERATURE_RISE_C;
+  loadedThresholds.valid = true;
+  return true;
 }
 
 bool gradeDevice(const SensorSnapshot& sample,

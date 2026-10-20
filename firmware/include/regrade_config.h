@@ -31,4 +31,21 @@ constexpr int SERVO_DISPOSE_ANGLE = 150;
 
 constexpr char STATION_ID[] = "regrade-station-001";
 constexpr char MQTT_TOPIC[] = "regrade/regrade-station-001/diagnostics";
+
+// --- Grading thresholds ---------------------------------------------------
+// GRADING_RULES_APPROVED must stay false until the team has reviewed and
+// approved specific numbers below for this station's device population.
+// Flipping it to true with the zeroed defaults below would grade every
+// device against meaningless thresholds, so loadThresholds() in main.cpp
+// also refuses to treat the rule set as valid unless every value here is
+// non-zero. This single global rule set does not vary by device model;
+// per-model thresholds would need a device-identification input the
+// firmware does not currently have.
+constexpr bool GRADING_RULES_APPROVED = false;
+constexpr float GRADING_MINIMUM_WEIGHT_G = 0.0F;       // below this mass: missing/removed mass
+constexpr float GRADING_BASELINE_THICKNESS_MM = 0.0F;  // expected unswollen thickness
+constexpr float GRADING_SWELLING_MM = 0.0F;            // thickness increase over baseline that fails
+constexpr float GRADING_ZERO_CURRENT_MA = 0.0F;        // at/below this: no charging draw
+constexpr float GRADING_OVERCURRENT_MA = 0.0F;         // at/above this: overcurrent hazard
+constexpr float GRADING_TEMPERATURE_RISE_C = 0.0F;     // at/above this: thermal hazard
 }  // namespace config

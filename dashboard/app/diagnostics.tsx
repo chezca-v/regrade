@@ -2,6 +2,7 @@
 
 import "./globals.css";
 import React, { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { TopNav } from "./components/TopNav";
 import { Pill } from "./components/Pill";
@@ -23,6 +24,8 @@ type Telemetry = {
   status: string;
   duration_ms: number | null;
   readings: import("@/lib/database.types").Json;
+  grade: "A" | "B" | "C" | "D" | null;
+  health_score: number | null;
   fault: string | null;
   reported_at: string;
 };
@@ -69,7 +72,7 @@ export function DiagnosticsPage({ telemetry, telemetryError }: DiagnosticsPagePr
             ) : (
               <div className="rg-table-wrap">
                 <table className="rg-rules-table">
-                  <thead><tr><th>Received</th><th>Station</th><th>Session</th><th>Status</th><th>Weight (g)</th><th>Thickness (mm)</th><th>Current (mA)</th><th>Surface temp (°C)</th><th>Temp rise (°C)</th></tr></thead>
+                  <thead><tr><th>Received</th><th>Station</th><th>Session</th><th>Status</th><th>Grade</th><th>Health</th><th>Weight (g)</th><th>Thickness (mm)</th><th>Current (mA)</th><th>Surface temp (°C)</th><th>Temp rise (°C)</th><th></th></tr></thead>
                   <tbody>
                     {telemetry.map((record) => {
                       const readings = record.readings && typeof record.readings === "object" && !Array.isArray(record.readings)
@@ -81,7 +84,9 @@ export function DiagnosticsPage({ telemetry, telemetryError }: DiagnosticsPagePr
                       };
                       return <tr key={record.telemetry_id}>
                         <td>{new Date(record.reported_at).toISOString().replace("T", " ").slice(0, 19)} UTC</td><td>{record.station_id}</td><td>{record.session_id}</td><td>{record.status}</td>
+                        <td>{record.grade ?? "—"}</td><td>{record.health_score !== null ? `${record.health_score}%` : "—"}</td>
                         <td>{display("weight_g")}</td><td>{display("thickness_mm")}</td><td>{display("current_ma")}</td><td>{display("surface_temp_c")}</td><td>{display("temperature_rise_c")}</td>
+                        <td><Link href={`/inventory/${encodeURIComponent(record.session_id)}`} className="rg-btn">View</Link></td>
                       </tr>;
                     })}
                   </tbody>

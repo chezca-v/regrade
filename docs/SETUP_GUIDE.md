@@ -325,9 +325,14 @@ secure, always-on host with appropriate MQTT TLS and network settings.
 ## Current prototype limits
 
 The page displays reports; it does not calculate validated phone health. The
-firmware currently has no approved grading threshold set (`loadThresholds`
-returns unavailable), and diverter actuation is deliberately a no-op. A report
-may therefore have status `diagnostic_incomplete` or `calibration_required`.
-The current sensor depends on a protected fixture. Swelling classification
-requires model-specific baseline data and validation. Do not make safety,
-resale, or disposal decisions from this prototype.
+firmware ships with `GRADING_RULES_APPROVED = false` in `regrade_config.h`, so
+`loadThresholds` always reports the rule set unavailable and every session
+ends at `status: calibration_required` before grading. The six threshold
+constants above that flag are placeholders (zero), which `loadThresholds`
+also refuses to treat as valid even if the flag were flipped. Only set real,
+team-approved values and flip the flag once you have calibrated and reviewed
+them; do not copy illustrative numbers from elsewhere into this file. Diverter
+actuation is deliberately a no-op regardless of grading status. The current
+sensor depends on a protected fixture. Swelling classification requires
+model-specific baseline data and validation. Do not make safety, resale, or
+disposal decisions from this prototype.

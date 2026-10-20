@@ -7,7 +7,7 @@ export default async function Page() {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("station_telemetry")
-    .select("telemetry_id, station_id, session_id, status, duration_ms, readings, fault, reported_at")
+    .select("telemetry_id, station_id, session_id, status, duration_ms, readings, grade, health_score, fault, reported_at")
     .order("reported_at", { ascending: false })
     .limit(10);
 

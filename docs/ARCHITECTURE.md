@@ -23,10 +23,14 @@ flowchart LR
     Dashboard[Next.js dashboard] -->|publishable key + public telemetry policy| DB
 ```
 
-HX711 scale and ToF empty-bed distance values require station calibration.
-Device-model identification, approved grading-rule retrieval, and validated
-thresholds remain implementation work. A failed or incomplete reading
-produces partial telemetry and does not actuate the sorter.
+HX711 scale and ToF empty-bed distance values require station calibration
+(both are calibrated on the reference station; re-measure after remounting a
+sensor). Grading thresholds have a loading mechanism
+(`config::GRADING_RULES_APPROVED` and six threshold constants in
+`regrade_config.h`), but it ships disabled with placeholder zero values;
+per-device-model threshold scaling still has no identification input to key
+off of. A failed or incomplete reading produces partial telemetry and does
+not actuate the sorter.
 
 ## Components
 

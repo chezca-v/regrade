@@ -47,6 +47,26 @@ def _persist_telemetry(topic: str, payload: dict[str, Any]) -> None:
             LOGGER.warning("Ignoring telemetry with invalid reading %s", key)
             return
 
+    grade = payload.get("grade")
+    if grade is not None and grade not in ("A", "B", "C", "D"):
+        LOGGER.warning("Ignoring telemetry with invalid grade %r", grade)
+        return
+
+    health_score = payload.get("health_score")
+    if health_score is not None and (
+        isinstance(health_score, bool)
+        or not isinstance(health_score, (int, float))
+        or not math.isfinite(health_score)
+        or not 0 <= health_score <= 100
+    ):
+        LOGGER.warning("Ignoring telemetry with invalid health_score %r", health_score)
+        return
+
+    sort_success = payload.get("sort_success")
+    if sort_success is not None and not isinstance(sort_success, bool):
+        LOGGER.warning("Ignoring telemetry with invalid sort_success %r", sort_success)
+        return
+
     row = {
         "station_id": station_id,
         "session_id": session_id,
@@ -54,6 +74,9 @@ def _persist_telemetry(topic: str, payload: dict[str, Any]) -> None:
         "duration_ms": payload.get("duration_ms") if isinstance(payload.get("duration_ms"), int) and not isinstance(payload.get("duration_ms"), bool) and payload.get("duration_ms") >= 0 else None,
         "readings": readings,
         "fault": payload.get("fault") if isinstance(payload.get("fault"), str) else None,
+        "grade": grade,
+        "health_score": health_score,
+        "sort_success": sort_success,
     }
     endpoint = f"{supabase_url}/rest/v1/station_telemetry?on_conflict=station_id%2Csession_id"
     request = urllib.request.Request(

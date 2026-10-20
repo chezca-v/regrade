@@ -122,6 +122,9 @@ The sensors provide indicators, not definitive battery-cell diagnoses. The
 grading thresholds must be calibrated against a representative mock evaluation
 set before grading or sorting is enabled. See
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/ERD.md](docs/ERD.md).
+For a tracked list of what's still missing before an end-to-end demo — grading
+threshold approval, sorter validation, device-model linkage, and more — see
+[docs/OUTSTANDING_WORK.md](docs/OUTSTANDING_WORK.md).
 
 ### Database status
 

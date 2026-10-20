@@ -1,7 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
-import type { Database } from "@/lib/database.types";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -137,6 +136,7 @@ function ClockIcon() {
 async function fetchDeviceDetails(deviceId: string) {
   // Default values matching the design mock for REG-20261013-004
   const defaultData = {
+    isLive: false,
     deviceId: deviceId || "REG-20261013-004",
     deviceType: "Smartphone",
     modelName: "Model X14 (placeholder)",
@@ -221,158 +221,110 @@ async function fetchDeviceDetails(deviceId: string) {
   try {
     const supabase = await createClient();
 
-    // Determine numerical session ID from string ID if applicable
-    let numericSessionId: number | null = null;
-    if (/^\d+$/.test(deviceId)) {
-      numericSessionId = parseInt(deviceId, 10);
-    } else {
-      const match = deviceId.match(/-(\d+)$/);
-      if (match) {
-        numericSessionId = parseInt(match[1], 10);
-      }
-    }
+    // The device ID in the URL is the station-generated session_id
+    // (e.g. "REGRADE-01-aabbccdd-11223344"). Inventory rows in the mock
+    // audit log use a different, human-readable ID scheme and will not
+    // match any real session until a station reports under that ID.
+    const { data: telemetry } = await supabase
+      .from("station_telemetry")
+      .select(
+        "telemetry_id, station_id, session_id, status, duration_ms, readings, grade, health_score, fault, reported_at",
+      )
+      .eq("session_id", deviceId)
+      .order("reported_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-    if (numericSessionId === null) {
+    if (!telemetry) {
       return defaultData;
     }
 
-    // Query session diagnostic summary from view
-    const { data: diagnosticRow } = await supabase
-      .from("dashboard_diagnostics")
-      .select("*")
-      .eq("session_id", numericSessionId)
-      .maybeSingle();
+    const readings: Record<string, number | null> =
+      telemetry.readings && typeof telemetry.readings === "object" && !Array.isArray(telemetry.readings)
+        ? (telemetry.readings as Record<string, number | null>)
+        : {};
 
-    // Query sensor readings
-    const { data: readings } = await supabase
-      .from("sensor_reading")
-      .select("*")
-      .eq("session_id", numericSessionId);
-
-    // Query active alerts
-    const { data: alerts } = await supabase
-      .from("alert")
-      .select("*")
-      .eq("session_id", numericSessionId)
-      .order("created_at", { ascending: false });
-
-    // Query grade result
-    const { data: gradeResult } = await supabase
-      .from("grade_result")
-      .select("*")
-      .eq("session_id", numericSessionId)
-      .maybeSingle();
-
-    // Query rule set if available
-    let activeRule: Database["public"]["Tables"]["grading_rule_set"]["Row"] | null = null;
-    if (gradeResult?.rule_version_id) {
-      const { data: ruleData } = await supabase
-        .from("grading_rule_set")
-        .select("*")
-        .eq("rule_version_id", gradeResult.rule_version_id)
-        .maybeSingle();
-      activeRule = ruleData;
-    }
-
-    if (!diagnosticRow && !readings && !alerts) {
-      return defaultData;
-    }
-
-    // Merge database record into data structure
     const formatTime = (isoString?: string | null) => {
       if (!isoString) return defaultData.testTime;
       const d = new Date(isoString);
       return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
     };
+    const timeStr = formatTime(telemetry.reported_at);
 
-    const timeStr = formatTime(diagnosticRow?.started_at);
+    const isGraded = telemetry.status === "graded" && telemetry.grade !== null;
+    const isHazard = telemetry.grade === "D";
 
-    // Sensor readings map
-    const esrReading = readings?.find((r) => r.sensor_type.toLowerCase().includes("esr"));
-    const currentReading = readings?.find(
-      (r) => r.sensor_type.toLowerCase().includes("current") || r.sensor_type.toLowerCase().includes("power"),
-    );
-    const tempReading = readings?.find((r) => r.sensor_type.toLowerCase().includes("temp"));
-    const swellReading = readings?.find(
-      (r) => r.sensor_type.toLowerCase().includes("swell") || r.sensor_type.toLowerCase().includes("thickness"),
-    );
-    const weightReading = readings?.find((r) => r.sensor_type.toLowerCase().includes("weight"));
-
-    const grade = diagnosticRow?.final_grade ?? gradeResult?.final_grade ?? "D";
-    const mappedResult =
-      grade === "D"
+    const mappedResult = !isGraded
+      ? telemetry.status
+      : telemetry.grade === "D"
         ? "Disposal"
-        : grade === "C"
-        ? "Recycle / Safe Dismantling"
-        : "Resellable / Refurbishable";
+        : telemetry.grade === "C"
+          ? "Recycle / Safe Dismantling"
+          : "Resellable / Refurbishable";
 
-    const hasAlert = Boolean(alerts && alerts.length > 0) || grade === "D";
+    const metricFromReading = (key: string, unit: string, label: string) => {
+      const value = readings[key];
+      return {
+        label,
+        value: typeof value === "number" ? value.toFixed(2) : "—",
+        unit,
+        limitText: "No per-reading limit is persisted for this station report",
+        statusText: isHazard ? "Flagged" : "Recorded",
+        isAlert: isHazard,
+      };
+    };
 
     return {
+      isLive: true,
       deviceId,
-      deviceType:
-        diagnosticRow?.device_type === "charger" ? "5V Charger" : "Smartphone",
-      modelName: diagnosticRow?.model_name ?? defaultData.modelName,
+      deviceType: "Not recorded by firmware",
+      modelName: "Not recorded by firmware",
       testTime: timeStr,
-      hasSafetyAlert: hasAlert,
-      alertTitle: alerts?.[0]?.message ?? defaultData.alertTitle,
-      alertSubtext: defaultData.alertSubtext,
+      hasSafetyAlert: isHazard,
+      alertTitle: "Safety alert: station flagged this device as a hazard",
+      alertSubtext: "Wear gloves and move the device to the quarantine shelf. Do not charge it.",
       completedTime: timeStr,
-      fullReadingsSubtitle: defaultData.fullReadingsSubtitle,
+      fullReadingsSubtitle: telemetry.fault
+        ? `Reported fault: ${telemetry.fault}`
+        : "Readings from the latest station report for this session.",
       metrics: {
-        batteryEsr: {
-          label: "Battery ESR",
-          value: esrReading ? String(esrReading.value) : defaultData.metrics.batteryEsr.value,
-          unit: esrReading?.unit || "mΩ",
-          limitText: activeRule ? `Limit ${activeRule.zero_current_ma || 250} mΩ` : defaultData.metrics.batteryEsr.limitText,
-          statusText: defaultData.metrics.batteryEsr.statusText,
-          isAlert: true,
-        },
-        powerDraw: {
-          label: "Power draw",
-          value: currentReading ? String(currentReading.value) : defaultData.metrics.powerDraw.value,
-          unit: currentReading?.unit || "mA",
-          limitText: activeRule ? `Overcurrent ${activeRule.overcurrent_ma} mA` : defaultData.metrics.powerDraw.limitText,
-          statusText: defaultData.metrics.powerDraw.statusText,
-          isAlert: true,
-        },
-        tempRise: {
-          label: "Temperature rise",
-          value: tempReading ? String(tempReading.value) : defaultData.metrics.tempRise.value,
-          unit: tempReading?.unit || "°C",
-          limitText: activeRule ? `Limit ${activeRule.temp_rise_c} °C` : defaultData.metrics.tempRise.limitText,
-          statusText: defaultData.metrics.tempRise.statusText,
-          isAlert: true,
-        },
-        casingSwell: {
-          label: "Casing swell",
-          value: swellReading ? String(swellReading.value) : defaultData.metrics.casingSwell.value,
-          unit: swellReading?.unit || "mm",
-          limitText: activeRule ? `Hazard above ${activeRule.thickness_swell_mm} mm` : defaultData.metrics.casingSwell.limitText,
-          statusText: defaultData.metrics.casingSwell.statusText,
-          isAlert: true,
-        },
+        batteryEsr: metricFromReading("weight_g", "g", "Weight"),
+        powerDraw: metricFromReading("current_ma", "mA", "Charging current"),
+        tempRise: metricFromReading("temperature_rise_c", "°C", "Temperature rise"),
+        casingSwell: metricFromReading("thickness_mm", "mm", "Thickness"),
       },
-      whyReasons: defaultData.whyReasons,
-      activity: defaultData.activity,
+      whyReasons: isGraded
+        ? [
+            `Graded ${telemetry.grade}${
+              telemetry.health_score !== null ? ` with a health score of ${telemetry.health_score}%` : ""
+            }. Per-check thresholds are not persisted by the current telemetry schema.`,
+          ]
+        : [
+            `Session status: ${telemetry.status}.${telemetry.fault ? ` ${telemetry.fault}.` : ""} No grade was produced.`,
+          ],
+      activity: [
+        { label: "Station report received", time: timeStr, type: "completed" as const },
+        ...(isHazard ? [{ label: "Safety alert raised", time: timeStr, type: "alert" as const }] : []),
+      ],
       diagnosticResult: mappedResult,
-      diagnosticResultDescription:
-        grade === "D"
-          ? "Heavy casing swelling and a thermal rise. Suggested destination is Bin C."
-          : "Device within expected triage operating range.",
+      diagnosticResultDescription: !isGraded
+        ? "This session has not produced a grade yet."
+        : isHazard
+          ? "One or more readings triggered a hazard grade. Route to the disposal bin."
+          : "Device within the automated grading rule's accepted range.",
       processingDecision: "Awaiting verification",
-      processingDecisionSubtitle:
-        grade === "D"
-          ? "Not yet verified. Confirm to route to Bin C, or override with a reason."
-          : "Ready for operator verification.",
+      processingDecisionSubtitle: isGraded
+        ? "Not yet verified. Confirm the result, or override with a reason."
+        : "No grade is available to verify yet.",
       info: {
-        deviceType: diagnosticRow?.device_type === "charger" ? "5V Charger" : "Smartphone",
-        model: diagnosticRow?.model_name ?? defaultData.info.model,
-        nominalWeight: defaultData.info.nominalWeight,
-        measuredWeight: weightReading ? `${weightReading.value} g` : defaultData.info.measuredWeight,
-        intakeBatch: defaultData.info.intakeBatch,
-        received: defaultData.info.received,
-        collectionCenter: defaultData.info.collectionCenter,
+        deviceType: "Not recorded by firmware",
+        model: "Not recorded by firmware",
+        nominalWeight: "Not recorded",
+        measuredWeight:
+          typeof readings["weight_g"] === "number" ? `${readings["weight_g"].toFixed(1)} g` : "Not recorded",
+        intakeBatch: "Not recorded",
+        received: new Date(telemetry.reported_at).toISOString().replace("T", " ").slice(0, 16) + " UTC",
+        collectionCenter: "Not recorded",
       },
     };
   } catch {
@@ -480,7 +432,7 @@ export default async function DeviceDetailPage({ params }: PageProps) {
             </h1>
             <p className="text-[13px] text-[#718077] mt-1">
               Inventory / Device detail. {data.deviceType}, {data.modelName}, tested at{" "}
-              {data.testTime}. Sample data.
+              {data.testTime}.{!data.isLive && " Sample data."}
             </p>
           </div>
 
@@ -723,9 +675,15 @@ export default async function DeviceDetailPage({ params }: PageProps) {
                         <span className="w-1.5 h-1.5 rounded-full bg-[#dc2626]" />
                         Disposal
                       </span>
-                    ) : (
+                    ) : data.diagnosticResult === "Recycle / Safe Dismantling" ||
+                      data.diagnosticResult === "Resellable / Refurbishable" ? (
                       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-[#e7f7ee] text-[#15803d]">
                         <span className="w-1.5 h-1.5 rounded-full bg-[#16a34a]" />
+                        {data.diagnosticResult}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-[#f0f3f1] text-[#65756c]">
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#9aa79f]" />
                         {data.diagnosticResult}
                       </span>
                     )}
