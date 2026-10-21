@@ -48,48 +48,38 @@ guidance in [`../CLAUDE.md`](../CLAUDE.md) as well.
 
 ## Implementation History: Dashboard Screens & Routes
 
-The following dashboard screens and routes have pixel-perfect layouts and
-responsive design in `dashboard/`. Only **Diagnostics** and **Reference
-Weights** read live Supabase data; the rest render from local mock state
-(`dashboard/lib/rg-data.ts` or inline constants) and say so in their page
-copy ("Sample data"). An earlier version of this section claimed live
-Supabase wiring for Inventory, Device Detail, and Sorting; that was
-aspirational and did not match the code, since the normalized schema those
-pages queried (`test_session`, `sensor_reading`, `grade_result`,
-`sort_action`, `alert`, `grading_rule_set`) had no writer and was dropped in
-migration `20261020020000`. Keep this list honest as screens change.
+The dashboard uses `station_telemetry` for received station reports and
+`operator_diagnosis` for the signed-in operator's saved review. Sorting,
+Safety Alerts, and Settings remain mock workflows; do not imply they persist
+to Supabase. The normalized schema (`test_session`, `sensor_reading`,
+`grade_result`, `sort_action`, `alert`, `grading_rule_set`) was dropped in
+migration `20261020020000` because firmware had no writer for it.
 
 1. **Diagnostics Screen (`/diagnostics`)**:
    - Location: `dashboard/app/diagnostics/page.tsx` (Server Component) +
      `dashboard/app/diagnostics.tsx` (presentational).
-   - "Latest station readings" table is live: it queries `station_telemetry`
-     (including `grade` and `health_score`) ordered by `reported_at`. The rest
-     of the page (current test stepper, grading-rules reference table, device
-     queue) is still local mock state.
+   - Queries `station_telemetry` and phone references. New diagnostic flow
+     requires selecting a saved phone reference, then instructs the operator
+     to press the physical station START button. It polls for a new report;
+     only readings with `readings.stable = true` are displayed or saved.
+   - Saving requires an authenticated operator and writes the model reference
+     and disposition to `operator_diagnosis`. This is an operator review, not
+     a firmware grade or safety determination.
 
 2. **Inventory Dashboard (`/inventory`)**:
-   - Location: `dashboard/app/inventory/page.tsx` (re-exported via
-     `dashboard/app/inventory.tsx`). Entirely local mock state
-     (`INVENTORY_DATA`); not wired to Supabase.
-   - Summary KPI cards (*Devices on record*, *Awaiting verification*, *Resellable / Refurbishable*, *Disposal*).
-   - Dynamic audit log data table with segmented filtering tabs (*All devices*, *Resellable*, *Recycle*, *Disposal*, *Needs verification*), search by device ID, and time range selection.
-   - Row-level alert indicators with warning background highlights for disposal devices (e.g., `REG-20261013-004`).
-   - Row click navigation routing directly to the corresponding Device Detail page.
+   - Location: `dashboard/app/inventory/page.tsx` and
+     `dashboard/app/inventory.tsx`. Queries station telemetry and the current
+     operator's saved dispositions. Lists actual station/session IDs, status,
+     selected model reference, and stable readings only; no mock classifications.
+   - Filtering and search operate on the returned reports. Rows link to the
+     corresponding Device Detail page.
 
 3. **Device Detail Screen (`/inventory/[id]`)**:
-   - Location: `dashboard/app/inventory/[id]/page.tsx`.
-   - Server Component that queries `station_telemetry` by `session_id` (the
-     URL parameter). Inventory's mock row IDs (e.g. `REG-20261013-004`) do not
-     match real firmware-generated session IDs, so navigating from the mock
-     Inventory list will show the placeholder fallback until a real session
-     uses that exact ID; this is expected given Inventory itself is still mock.
-   - Only fields the firmware actually reports are shown: `status`, `grade`,
-     `health_score`, `fault`, and the four `readings` values. There is no
-     stored device model, per-check threshold flags, bin, or activity
-     timeline for a telemetry row, so those sections render honestly reduced
-     content (e.g. "No per-reading limit is persisted for this station
-     report") instead of fabricated values.
-   - Safety Alert banner shown only when `grade = 'D'`.
+   - Location: `dashboard/app/inventory/[id]/page.tsx`. Loads the actual
+     station report and the current operator's associated review by session ID.
+     Missing sessions return not-found; they do not render sample records.
+   - Raw readings and firmware grade are hidden unless `readings.stable` is
+     true. The phone model is shown only when a saved operator review links it.
 
 4. **Sorting Screen (`/sorting`)**:
    - Location: `dashboard/app/sorting/page.tsx` (re-exported via
@@ -105,7 +95,13 @@ migration `20261020020000`. Keep this list honest as screens change.
    - Dynamic threshold calculations for accepted tolerance (±5% nominal) and recycle thresholds (< −15% nominal).
    - Brand filtering dropdown and model search with responsive table pagination.
 
-6. **Settings Screen (`/settings`)**:
+6. **Overview and Reports (`/overview`, `/reports`)**:
+   - Read station reports and the current operator's own dispositions through
+     `dashboard/lib/diagnostic-records.ts`. Counts and exports are derived from
+     those records. Disposition labels are operator decisions, not automatic
+     classifications. Reports do not expose unstable raw readings.
+
+7. **Settings Screen (`/settings`)**:
    - Location: `dashboard/app/settings/page.tsx`. Entirely local mock state;
      not wired to Supabase, and its own copy says so ("Sample data mode",
      "Not connected").
@@ -120,4 +116,3 @@ migration `20261020020000`. Keep this list honest as screens change.
    - Updated the Reference Weights screen (`dashboard/app/diagnostics/reference-weights/page.tsx` & `table-client.tsx`) to display 52 curated authentic smartphones (Apple iPhone 16/15/14/13/12/11/SE, Samsung Galaxy S24/S23/S22/A54/A34/Z Flip, Google Pixel 9/8/7/6, OnePlus 12/11, Xiaomi 14, Motorola Edge, Sony Xperia) with exact nominal weights and calculated tolerance ranges (accepted ±5%, recycle <85%).
    - Restored and polished the layout styling for `/settings` and `/diagnostics/reference-weights` matching ReGrade visual tokens and top navigation.
    - Verified complete production build (`npm run build`) with zero TypeScript errors.
-

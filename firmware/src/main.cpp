@@ -5,7 +5,6 @@
 #include <HX711.h>
 #include <LiquidCrystal_I2C.h>
 #include <PubSubClient.h>
-#include <VL53L0X.h>
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <Wire.h>
@@ -13,6 +12,7 @@
 #include <math.h>
 
 #include "regrade_config.h"
+#include "tof_sensor.h"
 
 #if __has_include("secrets.h")
 #include "secrets.h"
@@ -71,13 +71,22 @@ struct GradeResult {
   const char* status = "not_tested";
 };
 
+struct StabilityWindow {
+  float values[5][config::SENSOR_STABILITY_REQUIRED_SAMPLES] = {};
+  uint8_t samples = 0;
+  uint8_t nextSample = 0;
+  uint32_t firstSampleAt = 0;
+  uint32_t lastSampleAt = 0;
+};
+
 State state = State::IDLE;
 SensorSnapshot readings;
 GradingThresholds thresholds;
 GradeResult result;
+StabilityWindow stabilityWindow;
 
 HX711 loadCell;
-VL53L0X tofSensor;
+ToFSensor tofSensor;
 Adafruit_MLX90614 irSensor;
 Adafruit_INA219 currentSensor;
 LiquidCrystal_I2C lcd(config::LCD_I2C_ADDRESS, config::LCD_COLUMNS,
@@ -103,12 +112,14 @@ bool currentValid = false;
 bool temperatureValid = false;
 bool sortSuccess = false;
 bool reportPending = false;
+bool readingsStable = false;
 bool buttonStableState = HIGH;
 bool buttonLastReading = HIGH;
 uint32_t buttonChangedAt = 0;
 uint32_t lastNetworkAttemptAt = 0;
 uint32_t sessionStartedAt = 0;
 uint32_t sortStartedAt = 0;
+uint32_t lastStabilitySampleAt = 0;
 int sortAngle = config::SERVO_RECYCLE_ANGLE;
 const char* faultMessage = "";
 
@@ -140,10 +151,14 @@ void enterState(State nextState) {
       break;
     case State::SCAN:
       readings = SensorSnapshot{};
+      stabilityWindow = StabilityWindow{};
       scanValid = false;
+      readingsStable = false;
       faultMessage = "";
       result = GradeResult{};
       sessionStartedAt = millis();
+      lastStabilitySampleAt = sessionStartedAt -
+                              config::SENSOR_STABILITY_SAMPLE_INTERVAL_MS;
       showMessage("Scanning", "Do not remove item");
       break;
     case State::GRADE:
@@ -174,8 +189,8 @@ bool readWeight(float& weightG) {
 
 bool readThickness(float& thicknessMm) {
   if (!tofReady || config::TOF_EMPTY_BED_DISTANCE_MM <= 0.0F) return false;
-  const uint16_t distanceMm = tofSensor.readRangeContinuousMillimeters();
-  if (tofSensor.timeoutOccurred() || distanceMm >= 8190) return false;
+  uint16_t distanceMm = 0;
+  if (!tofSensor.readRangeMillimeters(distanceMm)) return false;
   const float thickness = config::TOF_EMPTY_BED_DISTANCE_MM - distanceMm;
   if (!isfinite(thickness) || thickness <= 0.0F) return false;
   thicknessMm = thickness;
@@ -200,16 +215,89 @@ bool readSurfaceTemperature(float& temperatureC, float& temperatureRiseC) {
   return true;
 }
 
-bool scanSensors() {
-  weightValid = readWeight(readings.weightG);
-  thicknessValid = readThickness(readings.thicknessMm);
-  currentValid = readElectricalCurrent(readings.currentMa);
-  temperatureValid =
-      readSurfaceTemperature(readings.surfaceTempC, readings.temperatureRiseC);
+bool stabilityTolerancesConfigured() {
+  const float tolerances[5] = {
+      config::WEIGHT_STABILITY_TOLERANCE_G,
+      config::THICKNESS_STABILITY_TOLERANCE_MM,
+      config::CURRENT_STABILITY_TOLERANCE_MA,
+      config::SURFACE_TEMP_STABILITY_TOLERANCE_C,
+      config::TEMP_RISE_STABILITY_TOLERANCE_C};
+  for (const float tolerance : tolerances) {
+    if (!isfinite(tolerance) || tolerance <= 0.0F) return false;
+  }
+  return true;
+}
 
-  const bool allValid = weightValid && thicknessValid && currentValid && temperatureValid;
-  if (!allValid) faultMessage = "Sensor read/calibration unavailable";
-  return allValid;
+bool scanSensors() {
+  SensorSnapshot sample;
+  weightValid = readWeight(sample.weightG);
+  thicknessValid = readThickness(sample.thicknessMm);
+  currentValid = readElectricalCurrent(sample.currentMa);
+  temperatureValid =
+      readSurfaceTemperature(sample.surfaceTempC, sample.temperatureRiseC);
+
+  if (!weightValid || !thicknessValid || !currentValid || !temperatureValid) {
+    stabilityWindow = StabilityWindow{};
+    faultMessage = "Sensor read/calibration unavailable";
+    return false;
+  }
+  faultMessage = "";
+
+  const float sampleValues[5] = {
+      sample.weightG, sample.thicknessMm, sample.currentMa,
+      sample.surfaceTempC, sample.temperatureRiseC};
+  const uint32_t sampleAt = millis();
+  if (stabilityWindow.samples == 0) {
+    stabilityWindow.firstSampleAt = sampleAt;
+  }
+  stabilityWindow.lastSampleAt = sampleAt;
+  for (uint8_t index = 0; index < 5; ++index) {
+    stabilityWindow.values[index][stabilityWindow.nextSample] = sampleValues[index];
+  }
+  stabilityWindow.nextSample =
+      (stabilityWindow.nextSample + 1) % config::SENSOR_STABILITY_REQUIRED_SAMPLES;
+  if (stabilityWindow.samples < config::SENSOR_STABILITY_REQUIRED_SAMPLES) {
+    ++stabilityWindow.samples;
+  }
+
+  const float tolerances[5] = {
+      config::WEIGHT_STABILITY_TOLERANCE_G,
+      config::THICKNESS_STABILITY_TOLERANCE_MM,
+      config::CURRENT_STABILITY_TOLERANCE_MA,
+      config::SURFACE_TEMP_STABILITY_TOLERANCE_C,
+      config::TEMP_RISE_STABILITY_TOLERANCE_C};
+  if (stabilityWindow.samples < config::SENSOR_STABILITY_REQUIRED_SAMPLES) {
+    return false;
+  }
+  float minimum[5] = {sampleValues[0], sampleValues[1], sampleValues[2],
+                      sampleValues[3], sampleValues[4]};
+  float maximum[5] = {sampleValues[0], sampleValues[1], sampleValues[2],
+                      sampleValues[3], sampleValues[4]};
+  float total[5] = {};
+  for (uint8_t readingIndex = 0;
+       readingIndex < config::SENSOR_STABILITY_REQUIRED_SAMPLES;
+       ++readingIndex) {
+    for (uint8_t sensorIndex = 0; sensorIndex < 5; ++sensorIndex) {
+      const float value = stabilityWindow.values[sensorIndex][readingIndex];
+      if (value < minimum[sensorIndex]) minimum[sensorIndex] = value;
+      if (value > maximum[sensorIndex]) maximum[sensorIndex] = value;
+      total[sensorIndex] += value;
+    }
+  }
+  readings.weightG = total[0] / stabilityWindow.samples;
+  readings.thicknessMm = total[1] / stabilityWindow.samples;
+  readings.currentMa = total[2] / stabilityWindow.samples;
+  readings.surfaceTempC = total[3] / stabilityWindow.samples;
+  readings.temperatureRiseC = total[4] / stabilityWindow.samples;
+  for (uint8_t index = 0; index < 5; ++index) {
+    if (!isfinite(tolerances[index]) || tolerances[index] <= 0.0F ||
+        maximum[index] - minimum[index] > tolerances[index]) {
+      return false;
+    }
+  }
+
+  readingsStable = true;
+  return true;
 }
 
 bool loadThresholds(GradingThresholds& loadedThresholds) {
@@ -359,13 +447,19 @@ void publishReport() {
   document["fault"] = faultMessage[0] == '\0' ? nullptr : faultMessage;
 
   JsonObject sensorData = document.createNestedObject("readings");
-  if (weightValid) sensorData["weight_g"] = readings.weightG;
+  sensorData["stable"] = readingsStable;
+  sensorData["stability_samples"] = stabilityWindow.samples;
+  sensorData["stability_window_ms"] =
+      stabilityWindow.samples > 0
+          ? stabilityWindow.lastSampleAt - stabilityWindow.firstSampleAt
+          : 0;
+  if (readingsStable && weightValid) sensorData["weight_g"] = readings.weightG;
   else sensorData["weight_g"] = nullptr;
-  if (thicknessValid) sensorData["thickness_mm"] = readings.thicknessMm;
+  if (readingsStable && thicknessValid) sensorData["thickness_mm"] = readings.thicknessMm;
   else sensorData["thickness_mm"] = nullptr;
-  if (currentValid) sensorData["current_ma"] = readings.currentMa;
+  if (readingsStable && currentValid) sensorData["current_ma"] = readings.currentMa;
   else sensorData["current_ma"] = nullptr;
-  if (temperatureValid) {
+  if (readingsStable && temperatureValid) {
     sensorData["surface_temp_c"] = readings.surfaceTempC;
     sensorData["temperature_rise_c"] = readings.temperatureRiseC;
   } else {
@@ -431,15 +525,17 @@ void setupSensorsAndUi() {
     loadCell.set_scale(config::HX711_COUNTS_PER_GRAM);
     loadCell.tare(10);
   }
-  tofSensor.setTimeout(500);
-  tofReady = tofSensor.init();
-  if (tofReady) tofSensor.startContinuous(100);
+  tofReady = tofSensor.begin();
   mlxReady = irSensor.begin();
   inaReady = currentSensor.begin();
   if (inaReady) currentSensor.setCalibration_32V_2A();
 
   if (!hx711Ready) Serial.println("HX711 unavailable");
-  if (!tofReady) Serial.println("VL53L0X initialization failed");
+  if (tofReady) {
+    Serial.printf("%s initialized\n", tofSensor.modelName());
+  } else {
+    Serial.println("VL53L0X/VL53L1X initialization failed");
+  }
   if (!mlxReady) Serial.println("MLX90614 initialization failed");
   if (!inaReady) Serial.println("INA219 initialization failed");
 }
@@ -480,12 +576,29 @@ void loop() {
     case State::IDLE:
       break;
     case State::SCAN:
-      scanValid = scanSensors();
-      if (!scanValid) {
-        result.status = "diagnostic_incomplete";
+      if (millis() - sessionStartedAt >=
+          config::SENSOR_STABILITY_TIMEOUT_MS -
+              config::SENSOR_STABILITY_SAMPLE_GUARD_MS) {
+        scanValid = false;
+        if (stabilityWindow.samples == 0) {
+          result.status = "diagnostic_incomplete";
+          faultMessage = "No complete sensor samples";
+        } else if (!stabilityTolerancesConfigured()) {
+          result.status = "stability_unvalidated";
+          faultMessage = "Sensor stability tolerances not calibrated";
+        } else {
+          result.status = "sensor_unstable";
+          faultMessage = "Sensors did not stabilize within 15 seconds";
+        }
         enterState(State::REPORT);
-      } else {
-        enterState(State::GRADE);
+      } else if (millis() - lastStabilitySampleAt >=
+                 config::SENSOR_STABILITY_SAMPLE_INTERVAL_MS) {
+        scanValid = scanSensors();
+        lastStabilitySampleAt = millis();
+        if (scanValid) {
+          result.status = "readings_stable";
+          enterState(State::GRADE);
+        }
       }
       break;
     case State::GRADE:

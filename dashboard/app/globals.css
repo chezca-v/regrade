@@ -7378,6 +7378,7 @@ a {
 .rg-reference-compare select, .rg-reference-form input { min-height: 40px; padding: 8px 10px; color: var(--rg-ink); background: #fff; border: 1px solid var(--rg-line); border-radius: 8px; }
 .rg-decision-select { display: grid; gap: 8px; margin: 14px 0; font-weight: 650; }
 .rg-decision-select select { min-height: 42px; padding: 8px 10px; color: var(--rg-ink); background: #fff; border: 1px solid var(--rg-line); border-radius: 8px; }
+.rg-diagnostic-reference-input { width: 100%; min-height: 42px; padding: 8px 10px; color: var(--rg-ink); background: #fff; border: 1px solid var(--rg-line); border-radius: 8px; }
 .rg-reference-compare__values { display: grid; gap: 6px; padding: 12px; background: #f5f8f6; border-radius: 8px; font-size: 13px; }
 .rg-reference-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 14px 0 20px; padding: 16px; background: #f5f8f6; border-radius: 12px; }
 .rg-reference-form label { display: grid; gap: 6px; color: var(--rg-muted); font-size: 12px; }

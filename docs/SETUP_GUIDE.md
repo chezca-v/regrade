@@ -266,18 +266,35 @@ port.
 
 ## 9. Send a reading and verify the full path
 
-1. Confirm Docker, the Python listener, and the dashboard are running.
-2. Press the station's start button and run a test object through the scan.
-   The current sensor needs a suitable reviewed, protected fixture; do not
-   connect an unreviewed electrical load.
-3. The ESP32 serial monitor should report `Diagnostic report published`.
-4. The Python terminal should show `Diagnostic received` followed by
-   `Persisted telemetry station=... session=...`.
-5. Refresh <http://localhost:3000/diagnostics>. The report should show its
-   timestamp, station, status, and available sensor readings. Missing sensor
-   values appear as a dash.
-6. In Supabase **Table Editor**, open `station_telemetry` and confirm the row
-   exists. Do not insert test data with the secret key in browser code.
+1. Repair any sensor initialization errors first. The station needs all sensors
+   and their calibration to acquire a complete set of readings.
+2. Stability approval is fail-closed. The five `*_STABILITY_TOLERANCE_*`
+   values in `firmware/include/regrade_config.h` default to zero. Measure
+   repeatability on the assembled station and obtain reviewed maximum ranges
+   for weight, thickness, current, surface temperature, and temperature rise
+   before setting them. Do not guess values. Until every tolerance is a
+   validated positive value, the station will not mark a result stable or
+   expose raw readings in the dashboard.
+3. Confirm Docker, the Python listener, and the dashboard are running. The
+   listener must log `Connected; subscribed to
+   regrade/+/diagnostics`.
+4. Open <http://localhost:3000/diagnostics>, choose **New diagnostic**, and
+   select a saved phone reference. Add a missing reference in **Phone
+   references** first.
+5. Place one closed phone on the station and press its physical **START**
+   button. The dashboard does not remotely trigger the ESP32. Firmware checks
+   three consecutive sensor samples and ends the scan within 15 seconds;
+   instability or uncalibrated tolerances produce no stable result.
+6. On a stable report, review the readings and choose an operator disposition.
+   **Save diagnosis** requires an authenticated dashboard user and writes the
+   phone reference and disposition to `operator_diagnosis`. It then appears in
+   Overview, Inventory, and Reports for that operator. These are operator
+   reviews, not automated safety or recycling classifications.
+7. The ESP32 serial monitor should report `Diagnostic report published`. The
+   Python terminal should show `Diagnostic received` followed by
+   `Persisted telemetry station=... session=...`. Confirm the row in Supabase
+   **Table Editor** if needed. Do not insert test data with a service key in
+   browser code.
 
 MQTT messages are not saved for later by this setup. The listener must be
 connected when the ESP32 publishes, or that report will be missed. Re-publish
@@ -316,6 +333,7 @@ secure, always-on host with appropriate MQTT TLS and network settings.
 | Listener connection refused | Ensure Docker is running and `docker ps` shows the broker exposing port 1883. |
 | Listener connects but never logs a report | Confirm ESP32 uses the PC's LAN IP, same Wi-Fi, correct topic, and that a scan was started. |
 | ESP32 cannot connect to MQTT | Check Wi-Fi credentials, broker IP/port, Windows Firewall, and TLS mode match. |
+| `LCD initialization failed` or `VL53L0X initialization failed` | Power off and check I²C power, shared ground, SDA=GPIO21, SCL=GPIO22, and sensor-module compatibility. Run the all-sensors I²C test before scanning. |
 | `Supabase persistence disabled` | Set both Supabase variables in the same terminal that runs the listener. |
 | Supabase returns an error | Confirm the telemetry migrations applied to the linked project and use a current secret key. |
 | Local page says no reports | Check listener logs for `Persisted telemetry`, confirm both site keys point to the same project, then refresh. |
@@ -324,15 +342,12 @@ secure, always-on host with appropriate MQTT TLS and network settings.
 
 ## Current prototype limits
 
-The page displays reports; it does not calculate validated phone health. The
-firmware ships with `GRADING_RULES_APPROVED = false` in `regrade_config.h`, so
-`loadThresholds` always reports the rule set unavailable and every session
-ends at `status: calibration_required` before grading. The six threshold
-constants above that flag are placeholders (zero), which `loadThresholds`
-also refuses to treat as valid even if the flag were flipped. Only set real,
-team-approved values and flip the flag once you have calibrated and reviewed
-them; do not copy illustrative numbers from elsewhere into this file. Diverter
-actuation is deliberately a no-op regardless of grading status. The current
-sensor depends on a protected fixture. Swelling classification requires
-model-specific baseline data and validation. Do not make safety, resale, or
-disposal decisions from this prototype.
+The dashboard displays readings only when firmware confirms stability. All
+five sensor stability tolerances currently default to zero, so stable results
+remain unavailable until the assembled station is repaired, calibrated, and
+given reviewed tolerance values. The 15-second timeout bounds acquisition; it
+does not guarantee that a reading will stabilize. Firmware grading remains
+disabled with `GRADING_RULES_APPROVED = false`; grading thresholds and sorter
+actuation must not be enabled without independent review and calibration. The
+electrical test fixture remains unreviewed, and external readings do not
+diagnose battery cells or establish that a phone is safe.

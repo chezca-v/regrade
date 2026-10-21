@@ -39,6 +39,23 @@ def _persist_telemetry(topic: str, payload: dict[str, Any]) -> None:
         LOGGER.warning("Ignoring telemetry without session_id on %s", topic)
         return
     for key, value in readings.items():
+        # Firmware includes boolean stability metadata and integer sample
+        # counters alongside numeric measurements. Accept those explicit
+        # metadata types while still rejecting booleans as sensor values.
+        if key == "stable":
+            if isinstance(value, bool):
+                continue
+            LOGGER.warning("Ignoring telemetry with invalid stability flag")
+            return
+        if key in {"stability_samples", "stability_window_ms"}:
+            if (
+                isinstance(value, int)
+                and not isinstance(value, bool)
+                and value >= 0
+            ):
+                continue
+            LOGGER.warning("Ignoring telemetry with invalid reading %s", key)
+            return
         if value is not None and (
             isinstance(value, bool)
             or not isinstance(value, (int, float))

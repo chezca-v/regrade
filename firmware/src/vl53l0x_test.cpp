@@ -1,17 +1,15 @@
 #include <Arduino.h>
-#include <VL53L0X.h>
 #include <Wire.h>
 
 #include "i2c_diagnostics.h"
 #include "regrade_config.h"
+#include "tof_sensor.h"
 
 namespace {
-VL53L0X sensor;
+ToFSensor sensor;
 bool sensorReady = false;
 uint32_t lastReadingAt = 0;
 
-// The VL53L0X reports 8190/8191 mm when no target returns enough light.
-constexpr uint16_t OUT_OF_RANGE_MM = 8190;
 }  // namespace
 
 void setup() {
@@ -19,15 +17,12 @@ void setup() {
   delay(500);
   i2c_diagnostics::beginWithDiagnostics();
 
-  sensor.setTimeout(500);
-  sensorReady = sensor.init();
-  if (sensorReady) {
-    sensor.startContinuous(100);
-  }
+  sensorReady = sensor.begin();
 
-  Serial.println("ReGrade VL53L0X ToF test");
-  Serial.printf("Sensor init=%s (SDA=GPIO%u, SCL=GPIO%u, expected addr=0x29)\n",
+  Serial.println("ReGrade VL53L0X/VL53L1X ToF test");
+  Serial.printf("Sensor init=%s model=%s (SDA=GPIO%u, SCL=GPIO%u, addr=0x29)\n",
                 sensorReady ? "ok" : "failed",
+                sensor.modelName(),
                 static_cast<unsigned int>(config::I2C_SDA_PIN),
                 static_cast<unsigned int>(config::I2C_SCL_PIN));
 }
@@ -43,16 +38,12 @@ void loop() {
     return;
   }
 
-  const uint16_t distanceMm = sensor.readRangeContinuousMillimeters();
-  if (sensor.timeoutOccurred()) {
-    Serial.println("VL53L0X status=timeout");
-    return;
-  }
-  if (distanceMm >= OUT_OF_RANGE_MM) {
-    Serial.println("VL53L0X status=out_of_range");
+  uint16_t distanceMm = 0;
+  if (!sensor.readRangeMillimeters(distanceMm)) {
+    Serial.println("ToF status=no_new_valid_reading");
     return;
   }
 
-  Serial.printf("VL53L0X distance_mm=%u\n",
+  Serial.printf("%s distance_mm=%u\n", sensor.modelName(),
                 static_cast<unsigned int>(distanceMm));
 }

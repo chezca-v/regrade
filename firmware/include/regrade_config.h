@@ -24,6 +24,18 @@ constexpr uint32_t SERVO_SETTLE_MS = 800;
 constexpr uint32_t NETWORK_RETRY_MS = 5000;
 constexpr uint32_t MQTT_KEEPALIVE_SECONDS = 20;
 constexpr uint16_t MQTT_BUFFER_SIZE = 1024;
+constexpr uint32_t SENSOR_STABILITY_TIMEOUT_MS = 15000;
+constexpr uint32_t SENSOR_STABILITY_SAMPLE_INTERVAL_MS = 400;
+constexpr uint8_t SENSOR_STABILITY_REQUIRED_SAMPLES = 3;
+constexpr uint32_t SENSOR_STABILITY_SAMPLE_GUARD_MS = 1000;
+
+// Set these only after validating repeatability on the assembled station.
+// Zero keeps stability approval disabled until a measured tolerance is entered.
+constexpr float WEIGHT_STABILITY_TOLERANCE_G = 0.0F;
+constexpr float THICKNESS_STABILITY_TOLERANCE_MM = 0.0F;
+constexpr float CURRENT_STABILITY_TOLERANCE_MA = 0.0F;
+constexpr float SURFACE_TEMP_STABILITY_TOLERANCE_C = 0.0F;
+constexpr float TEMP_RISE_STABILITY_TOLERANCE_C = 0.0F;
 
 constexpr int SERVO_REFURBISH_ANGLE = 30;
 constexpr int SERVO_RECYCLE_ANGLE = 90;

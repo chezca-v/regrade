@@ -3,12 +3,12 @@
 #include <Arduino.h>
 #include <HX711.h>
 #include <LiquidCrystal_I2C.h>
-#include <VL53L0X.h>
 #include <Wire.h>
 #include <math.h>
 
 #include "i2c_diagnostics.h"
 #include "regrade_config.h"
+#include "tof_sensor.h"
 
 // Combined bench test for every module wired to the station: the shared I2C
 // bus (VL53L0X, MLX90614, INA219, LCD) plus the HX711 load cell on its own
@@ -16,7 +16,7 @@
 // module answers and prints live readings; it does not calibrate anything.
 namespace {
 HX711 loadCell;
-VL53L0X tofSensor;
+ToFSensor tofSensor;
 Adafruit_MLX90614 irSensor;
 Adafruit_INA219 currentSensor;
 LiquidCrystal_I2C lcd(config::LCD_I2C_ADDRESS, config::LCD_COLUMNS,
@@ -63,11 +63,7 @@ void setup() {
   loadCell.begin(config::HX711_DOUT_PIN, config::HX711_SCK_PIN);
   hx711Ready = loadCell.wait_ready_timeout(1000);
 
-  tofSensor.setTimeout(500);
-  tofReady = tofSensor.init();
-  if (tofReady) {
-    tofSensor.startContinuous(100);
-  }
+  tofReady = tofSensor.begin();
 
   mlxReady = irSensor.begin();
   inaReady = currentSensor.begin();
@@ -81,7 +77,8 @@ void setup() {
                 hx711Ready ? "ok" : "failed",
                 static_cast<unsigned int>(config::HX711_DOUT_PIN),
                 static_cast<unsigned int>(config::HX711_SCK_PIN));
-  Serial.printf("VL53L0X    init=%s (addr=0x29)\n", tofReady ? "ok" : "failed");
+  Serial.printf("ToF        init=%s model=%s (addr=0x29)\n",
+                tofReady ? "ok" : "failed", tofSensor.modelName());
   Serial.printf("MLX90614   init=%s (addr=0x5A)\n", mlxReady ? "ok" : "failed");
   Serial.printf("INA219     init=%s (addr=0x40)\n", inaReady ? "ok" : "failed");
 
@@ -112,18 +109,15 @@ void loop() {
   uint16_t distanceMm = 0;
   bool distanceValid = false;
   if (tofReady) {
-    distanceMm = tofSensor.readRangeContinuousMillimeters();
-    if (tofSensor.timeoutOccurred()) {
-      Serial.println("VL53L0X  status=timeout");
-    } else if (distanceMm >= 8190) {
-      Serial.println("VL53L0X  status=out_of_range");
-    } else {
+    if (tofSensor.readRangeMillimeters(distanceMm)) {
       distanceValid = true;
-      Serial.printf("VL53L0X  distance_mm=%u\n",
+      Serial.printf("ToF %s distance_mm=%u\n", tofSensor.modelName(),
                     static_cast<unsigned int>(distanceMm));
+    } else {
+      Serial.println("ToF     status=no_new_valid_reading");
     }
   } else {
-    Serial.println("VL53L0X  status=init_failed");
+    Serial.println("ToF     status=init_failed");
   }
 
   // --- MLX90614 ---

@@ -1,7 +1,7 @@
 # ReGrade: outstanding work
 
 This tracks what still needs to be done before ReGrade produces a real,
-trustworthy grade end to end, as of 2026-10-20. It complements
+trustworthy grade end to end, as of 2026-10-21. It complements
 [ARCHITECTURE.md](ARCHITECTURE.md) and [ERD.md](ERD.md), which describe what
 exists; this file describes what does not yet, and who needs to decide what.
 Keep it current as items close — do not let it drift the way the old
@@ -9,13 +9,16 @@ Keep it current as items close — do not let it drift the way the old
 
 ## What is already done
 
-So this isn't read as "nothing works": firmware → MQTT → `cloud/mqtt-listener.py`
-→ `station_telemetry` → the `/diagnostics` live table is complete and
-exercised end to end, including `grade`, `health_score`, and `sort_success`.
-`HX711_COUNTS_PER_GRAM` and `TOF_EMPTY_BED_DISTANCE_MM` are calibrated for the
-reference station. `device_model` is seeded with ~7,700 real phone specs and
-read by the Reference Weights screen. `/inventory/[id]` reads real telemetry
-by `session_id`, and `/diagnostics` links to it.
+Firmware → MQTT → `cloud/mqtt-listener.py` → `station_telemetry` → dashboard
+reporting code is implemented, but do not claim current hardware is validated:
+the current station has logged LCD and VL53L0X I²C initialization failures.
+Firmware now checks three consecutive samples against five per-sensor
+stability tolerances and times out within 15 seconds. Those tolerances
+intentionally default to zero, so the firmware cannot report stable readings
+until the assembled station has been repaired, calibrated, and reviewed.
+Phone references and operator dispositions can be connected to a report, and
+Overview, Inventory, Device Detail, and Reports now derive their data from
+telemetry and the signed-in operator's saved review.
 
 ## Firmware (`firmware/`)
 
@@ -32,6 +35,11 @@ by `session_id`, and `/diagnostics` links to it.
   `device_model.baseline_weight_g` could support. Needs a device
   identification input (manual selection via the LCD/button, a barcode/IMEI
   scan, etc.) before this is worth building.
+- **Sensor stability tolerance values are uncalibrated.** The
+  `*_STABILITY_TOLERANCE_*` constants are zero. Stability detection is
+  implemented fail-closed, but reports will not be stable until each value is
+  measured and approved on the assembled station. The recent I²C failures
+  must be fixed before measuring repeatability.
 - **Sorter actuation is a non-actuating stub.** `actuateDiverter()` in
   `firmware/src/main.cpp` always returns `false` by design. Needs: a reviewed
   mechanism (travel limits, interlocks), an independent servo power supply
@@ -62,16 +70,14 @@ by `session_id`, and `/diagnostics` links to it.
 
 ## Database / Supabase (`supabase/`)
 
-- **No link between telemetry and device identity.** `station_telemetry` has
-  no foreign key to `device_model`, because firmware doesn't report one (see
-  the firmware item above). Until it does, the dashboard can't show which
-  phone model a session was.
-- **No durable record of operator decisions.** The old `sort_action`/`alert`
-  tables were dropped in `20261020020000` because nothing wrote to them. If
-  you want "Verify and route" / "Override" actions on the Sorting or
-  Inventory screens to actually persist, that needs a new table, RLS policy,
-  and Server Actions — which also means deciding who is authorized to
-  override a result and whether an audit trail is required. Not yet designed.
+- **Phone identity is an operator association.** `operator_diagnosis` links a
+  selected `device_model` reference to a telemetry row for the signed-in
+  operator; the firmware does not identify the phone. Ensure migration
+  `20261021080000` is applied to enable this workflow.
+- The old `sort_action`/`alert` tables were dropped in `20261020020000`.
+  Sorting-screen "Verify and route" / "Override" actions still do not persist;
+  authorization and a separate audit trail need to be designed before wiring
+  physical sorting.
 - **Access control is single-tenant.** Per `ERD.md`, all authenticated
   accounts share one operator workspace with no per-role granularity, and
   there's no data-retention policy for `station_telemetry`. Flagged as
@@ -79,24 +85,17 @@ by `session_id`, and `/diagnostics` links to it.
 
 ## Dashboard (`dashboard/`)
 
-- **Overview, Inventory (list), Sorting, Safety Alerts, Reports, and
-  Settings are still local mock state**, not wired to Supabase. This isn't
-  an oversight to "just fix" — they're built around data that doesn't exist
-  yet (ESR readings, bin fill levels, A–D classification at scale) and
-  wiring them up now would mostly show empty states, since no session has
-  ever reached `status: graded`. Revisit once grading thresholds are
-  approved and there's real graded traffic to show.
-- **Device Detail (`/inventory/[id]`) is live but thin.** It only shows what
-  `station_telemetry` actually stores: status, grade, health score, fault,
-  and the four raw readings. There's no device model name, no per-check
-  threshold breakdown (which flag caused a grade — that level of detail
-  isn't persisted), and no multi-step activity timeline (only the one
-  report event). This is an honest reflection of current data, not a bug,
-  but it will look sparse until the gaps above close.
-- **No way to browse real sessions except via the Diagnostics table's "View"
-  link.** There's no real-data equivalent of the Inventory list, so a real
-  session is only reachable if you know (or click through from) its
-  `session_id`.
+- **Sorting, Safety Alerts, and Settings remain mock state.** Sorting is not
+  wired to the hardware or persisted. Safety Alerts and Settings have no
+  corresponding live workflow.
+- **Overview, Inventory, Device Detail, and Reports show actual telemetry and
+  the signed-in operator's own saved disposition.** They intentionally omit
+  unstable sensor readings and do not calculate an automated classification.
+  Apply the operator phone reference migration and sign in to save reviews.
+- **The diagnostic page does not remotely trigger the station.** It selects a
+  reference and waits for a report after the operator presses the physical
+  START button. MQTT reports are polled from Supabase; no browser-to-ESP32
+  command channel exists.
 
 ## Hardware / physical
 
