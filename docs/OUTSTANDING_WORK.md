@@ -23,12 +23,18 @@ telemetry and the signed-in operator's saved review.
 ## Firmware (`firmware/`)
 
 - **Grading thresholds are unapproved.** `config::GRADING_RULES_APPROVED` is
-  `false` and the six threshold constants in
-  `firmware/include/regrade_config.h` are placeholder zeros. Every real
-  session currently ends at `status: calibration_required`. Needs: a
-  specific reference device (or documented test population), real measured
-  threshold values, and a deliberate sign-off before flipping the flag. See
-  the "Decisions needed" section below for a starting point on the numbers.
+  `false`. Current-based grading (zero-current / overcurrent) was dropped
+  entirely rather than approved: there is no reviewed, current-limited load
+  fixture to apply a real charge stimulus, so an INA219 reading during a scan
+  does not reflect real device behavior either way (see the next bullet).
+  `GRADING_SWELLING_MM` (3.5 mm) and `GRADING_TEMPERATURE_RISE_C` (15 °C) are
+  set from the dashboard's own pre-existing placeholder numbers
+  (`lib/rg-data.ts`), adopted as a deliberate decision rather than left as
+  zero. `GRADING_MINIMUM_WEIGHT_G` and `GRADING_BASELINE_THICKNESS_MM` still
+  need one specific reference device's measured weight/thickness — the
+  firmware has no per-model identification input, so this is a single global
+  pair of values, not per-model. Every real session ends at
+  `status: calibration_required` until those two are set and the flag flips.
 - **No per-device-model thresholds.** `loadThresholds()` returns one global
   rule set; there is no way for the firmware to know which phone model is on
   the scale, so thresholds can't scale with a model's baseline weight the way
@@ -47,8 +53,9 @@ telemetry and the signed-in operator's saved review.
 - **The electrical test fixture is not yet reviewed.** `readElectricalCurrent()`
   reads whatever the INA219 is wired to; the "current-limited 5 V test
   fixture" it depends on is still a planned/unreviewed circuit per
-  `circuit/`. `GRADING_OVERCURRENT_MA` must match this fixture's real current
-  limit once it exists — don't set one without the other.
+  `circuit/`. `current_ma` is still measured and reported in telemetry for
+  visibility, but it does not gate a grade (see above) until that fixture
+  exists and a real current threshold can be reviewed against it.
 - **Grade B is undefined.** `gradeDevice()` only emits A, C, or D; there's a
   `TODO` at `firmware/src/main.cpp` marking borderline criteria as
   uncalibrated. Decide if a Grade B tier is needed for this capstone's scope.
@@ -92,10 +99,14 @@ telemetry and the signed-in operator's saved review.
   the signed-in operator's own saved disposition.** They intentionally omit
   unstable sensor readings and do not calculate an automated classification.
   Apply the operator phone reference migration and sign in to save reviews.
-- **The diagnostic page does not remotely trigger the station.** It selects a
-  reference and waits for a report after the operator presses the physical
-  START button. MQTT reports are polled from Supabase; no browser-to-ESP32
-  command channel exists.
+- **The diagnostic page can remotely wake the station, best-effort.** A
+  signed-in operator's "Continue to station" queues a `station_command` row
+  (see migration `20261022090000`); `cloud/mqtt-listener.py` polls for pending
+  rows and relays them to the station's MQTT command topic, which the firmware
+  treats like a physical START press. There is no delivery guarantee (it
+  depends on the listener and broker being up), the browser never talks to
+  the ESP32 directly, and anonymous users still need the physical START
+  button. MQTT reports themselves are still polled from Supabase, not pushed.
 
 ## Hardware / physical
 
@@ -109,13 +120,13 @@ telemetry and the signed-in operator's saved review.
 
 ## Decisions needed from the team (not code changes)
 
-1. **Reference device and the six grading threshold values.** Starting
-   points already implied by the project's own UI (`dashboard/lib/rg-data.ts`,
-   `dashboard/app/settings/page.tsx`): swelling hazard 3.5 mm, zero-current
-   50 mA, temperature rise 15 °C. `GRADING_MINIMUM_WEIGHT_G` and
-   `GRADING_BASELINE_THICKNESS_MM` need an actual reference device's spec or
-   measured values; `GRADING_OVERCURRENT_MA` needs the real test fixture's
-   current limit once it's built.
+1. **Reference device for the remaining two grading threshold values.**
+   Swelling (3.5 mm) and temperature rise (15 °C) are adopted from the
+   project's own UI placeholders (`dashboard/lib/rg-data.ts`,
+   `dashboard/app/settings/page.tsx`). `GRADING_MINIMUM_WEIGHT_G` and
+   `GRADING_BASELINE_THICKNESS_MM` still need one specific reference device's
+   spec or measured weight/thickness before `GRADING_RULES_APPROVED` can flip
+   to `true`.
 2. **Whether operator triage decisions need to persist**, and if so, the
    authorization/audit model for who can verify or override a grade.
 3. **Whether per-device-model grading is in scope for this capstone**, and if

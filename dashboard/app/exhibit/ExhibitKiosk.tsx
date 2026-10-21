@@ -566,7 +566,7 @@ const TEAM_MEMBERS = [
     name: "Carl Andrew S. Dela Cruz",
     role: "Hardware Procurement & Assembly Lead",
     initials: "CAD",
-    photo: "/images/team/DelaCruz.jfif",
+    photo: "/images/team/DelaCruz.jpg",
   },
   {
     name: "Niña Ysabelle C. Frigillana",

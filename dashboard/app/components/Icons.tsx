@@ -62,3 +62,29 @@ export function SortIcon() {
     </svg>
   );
 }
+
+export function PhoneIcon({ size = 16 }: { size?: number } = {}) {
+  return (
+    <svg {...base} width={size} height={size} strokeWidth={1.8} aria-hidden="true">
+      <rect x="7" y="2.5" width="10" height="19" rx="2.2" />
+      <path d="M11 18.3h2" />
+    </svg>
+  );
+}
+
+export function ChargerIcon({ size = 16 }: { size?: number } = {}) {
+  return (
+    <svg {...base} width={size} height={size} strokeWidth={1.8} aria-hidden="true">
+      <path d="M8 2.5v4M13 2.5v4M6 6.5h9a1.5 1.5 0 0 1 1.5 1.5v3A5.5 5.5 0 0 1 11 16.5a5.5 5.5 0 0 1-5.5-5.5V8A1.5 1.5 0 0 1 6 6.5Z" />
+      <path d="M11 16.5V21" />
+    </svg>
+  );
+}
+
+export function PlusIcon({ size = 16 }: { size?: number } = {}) {
+  return (
+    <svg {...base} width={size} height={size} strokeWidth={2.2} aria-hidden="true">
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  );
+}

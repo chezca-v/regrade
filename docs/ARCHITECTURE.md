@@ -17,9 +17,11 @@ flowchart LR
     USB --> ESP
     ESP --> LCD[16x2 I2C LCD]
     ESP --> Servo[MG996R diverter]
-    ESP -->|MQTT; TLS recommended| Broker[HiveMQ or Mosquitto]
+    ESP -->|MQTT telemetry; TLS recommended| Broker[HiveMQ or Mosquitto]
+    Broker -->|MQTT command topic| ESP
     Broker --> Listener[Python MQTT listener]
-    Listener -->|server-only key| DB[(PostgreSQL / Supabase)]
+    Listener -->|server-only key: upsert telemetry, poll queued commands| DB[(PostgreSQL / Supabase)]
+    Listener -->|relays queued commands| Broker
     Dashboard[Next.js dashboard] -->|publishable key + public telemetry policy| DB
 ```
 
@@ -54,18 +56,21 @@ software substitutes for a properly isolated, current-limited fixture.
 
 ## Firmware states
 
-1. **IDLE**: wait for a debounced start-button press.
+1. **IDLE**: wait for a debounced start-button press or a `start` command on
+   the MQTT command topic.
 2. **SCAN**: attempt external sensor acquisition. Missing or uncalibrated
-   readings end the session without a grade or servo action.
+   readings end the session without a grade or servo action. A debounced
+   stop-button press aborts straight to REPORT from any non-IDLE state.
 3. **GRADE**: require a valid approved threshold set, then classify.
 4. **SORT**: move the diverter only after a valid grade; wait without blocking.
 5. **REPORT**: publish diagnostic status when the broker is available and show
    the outcome on the LCD.
 
-The loop services Wi-Fi/MQTT and the button alongside the state machine. MQTT
-uses TLS and a broker CA certificate by default; trusted local brokers can use
-plain MQTT when explicitly configured. Reports are currently
-best-effort; durable buffering and confirmed delivery have not been added.
+The loop services Wi-Fi/MQTT, the start/stop buttons, and incoming MQTT
+commands alongside the state machine. MQTT uses TLS and a broker CA
+certificate by default; trusted local brokers can use plain MQTT when
+explicitly configured. Reports are currently best-effort; durable buffering
+and confirmed delivery have not been added.
 
 ## Telemetry
 
@@ -75,10 +80,19 @@ include `session_id`, `station_id`, `status`, `grade`, `health_score`,
 measurement is serialized as `null`; consumers must not interpret null as a
 passing measurement. The cloud listener upserts reports into
 `station_telemetry` when `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are
-configured. It does not issue commands to the ESP32. The dashboard reads only
-this telemetry table without sign-in under a public read-only RLS policy; local
-and Vercel deployments show the same reports when they use the same Supabase
-project. Listener writes still require the server-only key.
+configured. The dashboard reads this telemetry table without sign-in under a
+public read-only RLS policy; local and Vercel deployments show the same
+reports when they use the same Supabase project. Listener writes still
+require the server-only key.
+
+The firmware also subscribes to `regrade/<station-id>/command`. A signed-in
+operator's "Continue to station" on the diagnostics page queues a row in
+`station_command`; the listener polls that table (roughly once per second)
+and publishes any pending row to the command topic, which the firmware
+treats like a physical START press, then marks the row delivered. This is
+the only command the firmware accepts today, it is best-effort (no delivery
+guarantee if the listener or broker is down), and the browser never talks to
+the ESP32 directly — the dashboard only ever reads and writes Supabase.
 
 The Supabase migration enables Row Level Security, grants authenticated users
 read-only access to operational data, and withholds device serial/IMEI values

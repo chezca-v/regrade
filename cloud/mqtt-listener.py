@@ -10,8 +10,10 @@ import os
 import signal
 import ssl
 import sys
+import threading
 import urllib.error
 import urllib.request
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +21,7 @@ import paho.mqtt.client as mqtt
 
 
 LOGGER = logging.getLogger("regrade.mqtt")
+_COMMAND_POLL_INTERVAL_SECONDS = 1.0
 
 
 def _persist_telemetry(topic: str, payload: dict[str, Any]) -> None:
@@ -114,6 +117,90 @@ def _persist_telemetry(topic: str, payload: dict[str, Any]) -> None:
         LOGGER.info("Persisted telemetry station=%s session=%s", station_id, session_id)
     except (OSError, urllib.error.URLError, RuntimeError) as error:
         LOGGER.error("Failed to persist telemetry: %s", error)
+
+
+def _relay_pending_commands(client: mqtt.Client) -> None:
+    """Forward dashboard-queued station_command rows to MQTT, then mark them delivered.
+
+    The dashboard cannot reach the broker directly (no credentials in the
+    browser), so it queues a row in Supabase instead; this listener is the
+    only thing with both the service-role key and an MQTT connection, so it
+    bridges the two. Rows stay undelivered (and get retried next poll) if the
+    publish or the delivered_at update fails.
+    """
+    supabase_url = os.getenv("SUPABASE_URL", "").rstrip("/")
+    service_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+    if not supabase_url or not service_key:
+        return
+
+    query = (
+        "station_command?delivered_at=is.null&order=requested_at.asc&limit=20"
+        "&select=command_id,station_id,command"
+    )
+    request = urllib.request.Request(
+        f"{supabase_url}/rest/v1/{query}",
+        headers={"apikey": service_key, "Authorization": f"Bearer {service_key}"},
+        method="GET",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=10) as response:
+            rows = json.loads(response.read().decode("utf-8"))
+    except (OSError, urllib.error.URLError, json.JSONDecodeError) as error:
+        LOGGER.error("Failed to poll station_command: %s", error)
+        return
+
+    if not isinstance(rows, list):
+        LOGGER.error("Unexpected station_command response shape")
+        return
+
+    for row in rows:
+        command_id = row.get("command_id") if isinstance(row, dict) else None
+        station_id = row.get("station_id") if isinstance(row, dict) else None
+        command = row.get("command") if isinstance(row, dict) else None
+        if (
+            not isinstance(command_id, int)
+            or not isinstance(station_id, str)
+            or not station_id
+            or not isinstance(command, str)
+            or not command
+        ):
+            LOGGER.warning("Ignoring malformed station_command row %r", row)
+            continue
+
+        topic = f"regrade/{station_id}/command"
+        payload = json.dumps({"command": command}, separators=(",", ":"))
+        info = client.publish(topic, payload, qos=1)
+        if info.rc != mqtt.MQTT_ERR_SUCCESS:
+            LOGGER.error("Failed to relay command %s to %s (rc=%s)", command, topic, info.rc)
+            continue
+
+        patch_request = urllib.request.Request(
+            f"{supabase_url}/rest/v1/station_command?command_id=eq.{command_id}",
+            data=json.dumps(
+                {"delivered_at": datetime.now(timezone.utc).isoformat()},
+                separators=(",", ":"),
+            ).encode("utf-8"),
+            headers={
+                "apikey": service_key,
+                "Authorization": f"Bearer {service_key}",
+                "Content-Type": "application/json",
+                "Prefer": "return=minimal",
+            },
+            method="PATCH",
+        )
+        try:
+            with urllib.request.urlopen(patch_request, timeout=10) as response:
+                if response.status >= 300:
+                    raise RuntimeError(f"Supabase returned HTTP {response.status}")
+            LOGGER.info("Relayed command=%s station=%s", command, station_id)
+        except (OSError, urllib.error.URLError, RuntimeError) as error:
+            LOGGER.error("Relayed command but failed to mark it delivered: %s", error)
+
+
+def _poll_commands_loop(client: mqtt.Client, stop_event: threading.Event) -> None:
+    while not stop_event.is_set():
+        _relay_pending_commands(client)
+        stop_event.wait(_COMMAND_POLL_INTERVAL_SECONDS)
 
 
 def _env_bool(name: str, default: bool) -> bool:
@@ -223,10 +310,16 @@ def main() -> int:
         return 1
 
     stopping = False
+    stop_event = threading.Event()
+    poll_thread = threading.Thread(
+        target=_poll_commands_loop, args=(client, stop_event), daemon=True
+    )
+    poll_thread.start()
 
     def stop_listener(_signum: int, _frame: Any) -> None:
         nonlocal stopping
         stopping = True
+        stop_event.set()
         client.disconnect()
 
     signal.signal(signal.SIGINT, stop_listener)
@@ -238,6 +331,7 @@ def main() -> int:
         stop_listener(signal.SIGINT, None)
     finally:
         if not stopping:
+            stop_event.set()
             client.disconnect()
 
     return 0

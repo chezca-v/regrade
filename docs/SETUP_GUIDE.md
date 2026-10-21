@@ -281,10 +281,14 @@ port.
 4. Open <http://localhost:3000/diagnostics>, choose **New diagnostic**, and
    select a saved phone reference. Add a missing reference in **Phone
    references** first.
-5. Place one closed phone on the station and press its physical **START**
-   button. The dashboard does not remotely trigger the ESP32. Firmware checks
-   three consecutive sensor samples and ends the scan within 15 seconds;
-   instability or uncalibrated tolerances produce no stable result.
+5. Place one closed phone on the station. If you're signed in, continuing past
+   **New diagnostic** queues a `station_command` row that the listener relays
+   to the station's MQTT command topic to start scanning; this is best-effort
+   (it depends on the listener and broker being reachable), so press the
+   physical **START** button if scanning doesn't begin within a few seconds,
+   or if you're not signed in. Firmware checks three consecutive sensor
+   samples and ends the scan within 15 seconds; instability or uncalibrated
+   tolerances produce no stable result.
 6. On a stable report, review the readings and choose an operator disposition.
    **Save diagnosis** requires an authenticated dashboard user and writes the
    phone reference and disposition to `operator_diagnosis`. It then appears in

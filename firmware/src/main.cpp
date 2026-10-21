@@ -10,6 +10,7 @@
 #include <Wire.h>
 #include <esp_system.h>
 #include <math.h>
+#include <string.h>
 
 #include "regrade_config.h"
 #include "tof_sensor.h"
@@ -59,8 +60,6 @@ struct GradingThresholds {
   float minimumWeightG = 0.0F;
   float baselineThicknessMm = 0.0F;
   float swellingMm = 0.0F;
-  float zeroCurrentMa = 0.0F;
-  float overcurrentMa = 0.0F;
   float temperatureRiseC = 0.0F;
   bool valid = false;
 };
@@ -116,6 +115,9 @@ bool readingsStable = false;
 bool buttonStableState = HIGH;
 bool buttonLastReading = HIGH;
 uint32_t buttonChangedAt = 0;
+bool stopButtonStableState = HIGH;
+bool stopButtonLastReading = HIGH;
+uint32_t stopButtonChangedAt = 0;
 uint32_t lastNetworkAttemptAt = 0;
 uint32_t sessionStartedAt = 0;
 uint32_t sortStartedAt = 0;
@@ -309,8 +311,6 @@ bool loadThresholds(GradingThresholds& loadedThresholds) {
       config::GRADING_MINIMUM_WEIGHT_G <= 0.0F ||
       config::GRADING_BASELINE_THICKNESS_MM <= 0.0F ||
       config::GRADING_SWELLING_MM <= 0.0F ||
-      config::GRADING_ZERO_CURRENT_MA <= 0.0F ||
-      config::GRADING_OVERCURRENT_MA <= 0.0F ||
       config::GRADING_TEMPERATURE_RISE_C <= 0.0F) {
     return false;
   }
@@ -318,8 +318,6 @@ bool loadThresholds(GradingThresholds& loadedThresholds) {
   loadedThresholds.minimumWeightG = config::GRADING_MINIMUM_WEIGHT_G;
   loadedThresholds.baselineThicknessMm = config::GRADING_BASELINE_THICKNESS_MM;
   loadedThresholds.swellingMm = config::GRADING_SWELLING_MM;
-  loadedThresholds.zeroCurrentMa = config::GRADING_ZERO_CURRENT_MA;
-  loadedThresholds.overcurrentMa = config::GRADING_OVERCURRENT_MA;
   loadedThresholds.temperatureRiseC = config::GRADING_TEMPERATURE_RISE_C;
   loadedThresholds.valid = true;
   return true;
@@ -335,15 +333,13 @@ bool gradeDevice(const SensorSnapshot& sample,
   const float swellMm = sample.thicknessMm - rules.baselineThicknessMm;
   const bool swollen = swellMm >= rules.swellingMm;
   const bool missingMass = sample.weightG < rules.minimumWeightG;
-  const bool noCurrent = sample.currentMa <= rules.zeroCurrentMa;
-  const bool overcurrent = sample.currentMa >= rules.overcurrentMa;
   const bool temperatureHazard =
       sample.temperatureRiseC >= rules.temperatureRiseC;
 
-  if (swollen || overcurrent || temperatureHazard) {
+  if (swollen || temperatureHazard) {
     gradeResult.grade = Grade::D;
     gradeResult.healthScore = 0;
-  } else if (missingMass || noCurrent) {
+  } else if (missingMass) {
     gradeResult.grade = Grade::C;
     gradeResult.healthScore = 25;
   } else {
@@ -420,6 +416,29 @@ void serviceNetwork() {
 
   if (!connected) {
     Serial.printf("MQTT connect failed, state=%d\n", mqttClient.state());
+    return;
+  }
+
+  if (!mqttClient.subscribe(config::MQTT_COMMAND_TOPIC)) {
+    Serial.println("Failed to subscribe to command topic");
+  }
+}
+
+void onMqttMessage(char* topic, uint8_t* payload, unsigned int length) {
+  if (strcmp(topic, config::MQTT_COMMAND_TOPIC) != 0) {
+    return;
+  }
+  if (state != State::IDLE) {
+    return;
+  }
+
+  StaticJsonDocument<128> command;
+  if (deserializeJson(command, payload, length) != DeserializationError::Ok) {
+    return;
+  }
+  const char* action = command["command"] | "";
+  if (strcmp(action, "start") == 0) {
+    enterState(State::SCAN);
   }
 }
 
@@ -504,6 +523,29 @@ void updateButton() {
   }
 }
 
+void updateStopButton() {
+  const bool reading = digitalRead(config::STOP_BUTTON_PIN);
+  if (reading != stopButtonLastReading) {
+    stopButtonChangedAt = millis();
+    stopButtonLastReading = reading;
+  }
+
+  if (millis() - stopButtonChangedAt < config::BUTTON_DEBOUNCE_MS ||
+      reading == stopButtonStableState) {
+    return;
+  }
+
+  stopButtonStableState = reading;
+  if (stopButtonStableState == LOW && state != State::IDLE &&
+      state != State::REPORT) {
+    result = GradeResult{};
+    result.status = "stopped_by_operator";
+    faultMessage = "Scan stopped by operator";
+    scanValid = false;
+    enterState(State::REPORT);
+  }
+}
+
 void setupSensorsAndUi() {
   Wire.begin(config::I2C_SDA_PIN, config::I2C_SCL_PIN);
 
@@ -556,12 +598,14 @@ void setupNetwork() {
   mqttClient.setKeepAlive(config::MQTT_KEEPALIVE_SECONDS);
   mqttClient.setSocketTimeout(2);
   mqttClient.setBufferSize(config::MQTT_BUFFER_SIZE);
+  mqttClient.setCallback(onMqttMessage);
 }
 }  // namespace
 
 void setup() {
   Serial.begin(115200);
   pinMode(config::START_BUTTON_PIN, INPUT_PULLUP);
+  pinMode(config::STOP_BUTTON_PIN, INPUT_PULLUP);
   setupSensorsAndUi();
 
   setupNetwork();
@@ -571,6 +615,7 @@ void setup() {
 void loop() {
   serviceNetwork();
   updateButton();
+  updateStopButton();
 
   switch (state) {
     case State::IDLE:
@@ -626,13 +671,17 @@ void loop() {
       if (reportPending) {
         reportPending = false;
         publishReport();
-        showMessage(result.grade == Grade::INVALID ? "Not graded" : "Complete",
-                    result.grade == Grade::INVALID
-                        ? result.status
-                        : (sortSuccess
-                               ? (result.grade == Grade::D ? "Hazard route"
-                                                           : "Sorted")
-                               : "Sort disabled"));
+        if (strcmp(result.status, "stopped_by_operator") == 0) {
+          showMessage("Stopped", "By operator");
+        } else {
+          showMessage(result.grade == Grade::INVALID ? "Not graded" : "Complete",
+                      result.grade == Grade::INVALID
+                          ? result.status
+                          : (sortSuccess
+                                 ? (result.grade == Grade::D ? "Hazard route"
+                                                             : "Sorted")
+                                 : "Sort disabled"));
+        }
       }
       if (millis() - sessionStartedAt >= config::SERVO_SETTLE_MS) {
         enterState(State::IDLE);

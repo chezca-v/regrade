@@ -14,6 +14,7 @@ constexpr float HX711_COUNTS_PER_GRAM =-36.9688F;
 // across a power cycle. Re-measure and update if the sensor is re-mounted.
 constexpr float TOF_EMPTY_BED_DISTANCE_MM = 251.2F;
 constexpr uint8_t START_BUTTON_PIN = 27;
+constexpr uint8_t STOP_BUTTON_PIN = 14;
 constexpr uint8_t SERVO_PIN = 18;
 constexpr uint8_t LCD_I2C_ADDRESS = 0x27;
 constexpr uint8_t LCD_COLUMNS = 16;
@@ -43,6 +44,7 @@ constexpr int SERVO_DISPOSE_ANGLE = 150;
 
 constexpr char STATION_ID[] = "regrade-station-001";
 constexpr char MQTT_TOPIC[] = "regrade/regrade-station-001/diagnostics";
+constexpr char MQTT_COMMAND_TOPIC[] = "regrade/regrade-station-001/command";
 
 // --- Grading thresholds ---------------------------------------------------
 // GRADING_RULES_APPROVED must stay false until the team has reviewed and
@@ -53,11 +55,15 @@ constexpr char MQTT_TOPIC[] = "regrade/regrade-station-001/diagnostics";
 // non-zero. This single global rule set does not vary by device model;
 // per-model thresholds would need a device-identification input the
 // firmware does not currently have.
+//
+// Current-based grading (zero-current / overcurrent) is intentionally not
+// part of this rule set: it would require an independently reviewed,
+// current-limited test fixture to apply a real charge/load stimulus to the
+// device (see circuit/README.md), which does not exist yet. current_ma is
+// still measured and reported in telemetry; it just does not gate a grade.
 constexpr bool GRADING_RULES_APPROVED = false;
 constexpr float GRADING_MINIMUM_WEIGHT_G = 0.0F;       // below this mass: missing/removed mass
 constexpr float GRADING_BASELINE_THICKNESS_MM = 0.0F;  // expected unswollen thickness
-constexpr float GRADING_SWELLING_MM = 0.0F;            // thickness increase over baseline that fails
-constexpr float GRADING_ZERO_CURRENT_MA = 0.0F;        // at/below this: no charging draw
-constexpr float GRADING_OVERCURRENT_MA = 0.0F;         // at/above this: overcurrent hazard
-constexpr float GRADING_TEMPERATURE_RISE_C = 0.0F;     // at/above this: thermal hazard
+constexpr float GRADING_SWELLING_MM = 3.5F;            // thickness increase over baseline that fails
+constexpr float GRADING_TEMPERATURE_RISE_C = 15.0F;    // at/above this: thermal hazard
 }  // namespace config

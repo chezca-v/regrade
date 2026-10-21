@@ -1,3 +1,4 @@
+import { isAuthSessionMissingError } from "@supabase/supabase-js";
 import type { DiagnosticRecord } from "@/lib/diagnostic-record-types";
 import { createClient } from "@/lib/supabase/server";
 
@@ -13,11 +14,15 @@ export async function loadDiagnosticRecords(): Promise<DiagnosticRecord[]> {
       .limit(500),
   ]);
 
-  if (userError) throw new Error(`Failed to identify dashboard operator: ${userError.message}`);
+  // getUser() errors even for the ordinary case of a visitor with no session
+  // at all (AuthSessionMissingError); treat only other auth errors as fatal.
+  if (userError && !isAuthSessionMissingError(userError)) {
+    throw new Error(`Failed to identify dashboard operator: ${userError.message}`);
+  }
   if (telemetryError) throw new Error(`Failed to load station telemetry: ${telemetryError.message}`);
   if (!telemetry) return [];
 
-  const user = userData.user;
+  const user = userError ? null : userData.user;
   const { data: reviews, error: reviewError } = user
     ? await supabase.from("operator_diagnosis")
       .select("telemetry_id, decision, device_model_id, notes, created_at")

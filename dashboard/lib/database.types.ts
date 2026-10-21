@@ -57,6 +57,14 @@ export type Database = {
         notes: string | null;
         created_at: string;
       }>;
+      station_command: Table<{
+        command_id: number;
+        station_id: string;
+        command: "start";
+        requested_by: string;
+        requested_at: string;
+        delivered_at: string | null;
+      }>;
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
