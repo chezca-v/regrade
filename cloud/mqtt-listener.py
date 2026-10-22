@@ -114,7 +114,10 @@ def _persist_telemetry(topic: str, payload: dict[str, Any]) -> None:
         with urllib.request.urlopen(request, timeout=10) as response:
             if response.status >= 300:
                 raise RuntimeError(f"Supabase returned HTTP {response.status}")
-        LOGGER.info("Persisted telemetry station=%s session=%s", station_id, session_id)
+        if row["status"] == "scanning":
+            LOGGER.debug("Persisted live sensor update station=%s session=%s", station_id, session_id)
+        else:
+            LOGGER.info("Persisted telemetry station=%s session=%s", station_id, session_id)
     except (OSError, urllib.error.URLError, RuntimeError) as error:
         LOGGER.error("Failed to persist telemetry: %s", error)
 
@@ -251,11 +254,14 @@ def _on_message(
         LOGGER.warning("Ignoring non-object JSON on %s", message.topic)
         return
 
-    LOGGER.info(
-        "Diagnostic received topic=%s payload=%s",
-        message.topic,
-        json.dumps(payload, separators=(",", ":"), sort_keys=True),
-    )
+    if payload.get("status") == "scanning":
+        LOGGER.debug("Live sensor update received topic=%s", message.topic)
+    else:
+        LOGGER.info(
+            "Diagnostic received topic=%s payload=%s",
+            message.topic,
+            json.dumps(payload, separators=(",", ":"), sort_keys=True),
+        )
     _persist_telemetry(message.topic, payload)
 
 

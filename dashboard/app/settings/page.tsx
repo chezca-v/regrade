@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { TopNav } from "../components/TopNav";
+import { SETTINGS_STORAGE_KEY, type StationMode } from "@/lib/settings";
 
 // --- Chevron Icon for Selects ---
 function ChevronDownIcon() {
@@ -44,9 +45,10 @@ function ToggleSwitch({ checked, onChange, ariaLabel }: ToggleProps) {
   );
 }
 
-const SETTINGS_STORAGE_KEY = "regrade-dashboard-settings-v1";
-
 export default function SettingsPage() {
+  // Diagnostic station mode
+  const [stationMode, setStationMode] = useState<StationMode>("live");
+
   // Notification Toggles
   const [safetyAlertPopup, setSafetyAlertPopup] = useState(true);
   const [soundDisposal, setSoundDisposal] = useState(true);
@@ -70,6 +72,7 @@ export default function SettingsPage() {
       const saved = localStorage.getItem(SETTINGS_STORAGE_KEY);
       if (!saved) return;
       const values = JSON.parse(saved) as Record<string, unknown>;
+      if (values.stationMode === "demo" || values.stationMode === "live") setStationMode(values.stationMode);
       if (typeof values.safetyAlertPopup === "boolean") setSafetyAlertPopup(values.safetyAlertPopup);
       if (typeof values.soundDisposal === "boolean") setSoundDisposal(values.soundDisposal);
       if (typeof values.awaitingReminder === "boolean") setAwaitingReminder(values.awaitingReminder);
@@ -89,6 +92,7 @@ export default function SettingsPage() {
       const saved = localStorage.getItem(SETTINGS_STORAGE_KEY);
       if (saved) {
         const values = JSON.parse(saved) as Record<string, unknown>;
+        setStationMode(values.stationMode === "demo" || values.stationMode === "live" ? values.stationMode : "live");
         setSafetyAlertPopup(typeof values.safetyAlertPopup === "boolean" ? values.safetyAlertPopup : true);
         setSoundDisposal(typeof values.soundDisposal === "boolean" ? values.soundDisposal : true);
         setAwaitingReminder(typeof values.awaitingReminder === "boolean" ? values.awaitingReminder : true);
@@ -99,6 +103,7 @@ export default function SettingsPage() {
         setLanguage(typeof values.language === "string" ? values.language : "English");
         setUseSampleData(typeof values.useSampleData === "boolean" ? values.useSampleData : true);
       } else {
+        setStationMode("live");
         setSafetyAlertPopup(true);
         setSoundDisposal(true);
         setAwaitingReminder(true);
@@ -117,6 +122,7 @@ export default function SettingsPage() {
 
   const handleSave = () => {
     localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify({
+      stationMode,
       safetyAlertPopup,
       soundDisposal,
       awaitingReminder,
@@ -324,6 +330,44 @@ export default function SettingsPage() {
 
             {/* Right Column */}
             <div className="rg-settings-col">
+              {/* Card: Diagnostic station mode */}
+              <section className="rg-card rg-card--pad" aria-labelledby="stationmode-heading">
+                <div className="rg-row rg-row--between">
+                  <h3 id="stationmode-heading" style={{ margin: 0 }}>Diagnostic station mode</h3>
+                  <span className={stationMode === "demo" ? "rg-tag-amber" : "rg-tag-gray"}>
+                    {stationMode === "demo" ? "Exhibit demo" : "Live"}
+                  </span>
+                </div>
+                <p className="rg-sub" style={{ marginTop: 4 }}>
+                  Controls what the Diagnostics page&rsquo;s New diagnostic button does.
+                </p>
+                <div className="rg-mode-toggle" role="radiogroup" aria-label="Diagnostic station mode" style={{ marginTop: 10 }}>
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={stationMode === "live"}
+                    className={`rg-mode-toggle__option${stationMode === "live" ? " is-active" : ""}`}
+                    onClick={() => setStationMode("live")}
+                  >
+                    Live ESP32 sensors
+                  </button>
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={stationMode === "demo"}
+                    className={`rg-mode-toggle__option${stationMode === "demo" ? " is-active" : ""}`}
+                    onClick={() => setStationMode("demo")}
+                  >
+                    Exhibit demo (simulated)
+                  </button>
+                </div>
+                <p className="rg-small rg-muted" style={{ marginTop: 10 }}>
+                  {stationMode === "demo"
+                    ? "New diagnostic runs a clearly labeled, fabricated scan for display purposes. It never contacts the real station and nothing is saved as a diagnostic report."
+                    : "New diagnostic sends a real wake command to the physical station and waits for its sensor report."}
+                </p>
+              </section>
+
               {/* Card 3: Data Source */}
               <section className="rg-card rg-card--pad" aria-labelledby="datasource-heading">
                 <div className="rg-row rg-row--between">

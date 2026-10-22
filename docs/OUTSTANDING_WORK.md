@@ -10,7 +10,9 @@ Keep it current as items close — do not let it drift the way the old
 ## What is already done
 
 Firmware → MQTT → `cloud/mqtt-listener.py` → `station_telemetry` → dashboard
-reporting code is implemented, but do not claim current hardware is validated:
+reporting code is implemented, including one-second live sensor updates during
+a scan and a hideable feed in the diagnostics scan window. Do not claim current
+hardware is validated:
 the current station has logged LCD and VL53L0X I²C initialization failures.
 Firmware now checks three consecutive samples against five per-sensor
 stability tolerances and times out within 15 seconds. Those tolerances
@@ -96,17 +98,22 @@ telemetry and the signed-in operator's saved review.
   wired to the hardware or persisted. Safety Alerts and Settings have no
   corresponding live workflow.
 - **Overview, Inventory, Device Detail, and Reports show actual telemetry and
-  the signed-in operator's own saved disposition.** They intentionally omit
+  the current visitor's own saved disposition.** They intentionally omit
   unstable sensor readings and do not calculate an automated classification.
-  Apply the operator phone reference migration and sign in to save reviews.
-- **The diagnostic page can remotely wake the station, best-effort.** A
-  signed-in operator's "Continue to station" queues a `station_command` row
+  There is no sign-in screen: every visitor gets a silent anonymous Supabase
+  Auth session (`lib/supabase/ensure-user.ts`), which still gives each saved
+  review a stable identity for "my own reviews" queries and RLS — apply the
+  operator phone reference migration and enable anonymous sign-ins on the
+  Supabase project for this to work.
+- **The diagnostic page can remotely wake the station, best-effort.** "Continue
+  to station" queues a `station_command` row
   (see migration `20261022090000`); `cloud/mqtt-listener.py` polls for pending
   rows and relays them to the station's MQTT command topic, which the firmware
   treats like a physical START press. There is no delivery guarantee (it
   depends on the listener and broker being up), the browser never talks to
   the ESP32 directly, and anonymous users still need the physical START
-  button. MQTT reports themselves are still polled from Supabase, not pushed.
+button. The dashboard polls Supabase about once per second for live sensor
+updates; it does not use a push subscription.
 
 ## Hardware / physical
 

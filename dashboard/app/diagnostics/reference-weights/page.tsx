@@ -11,6 +11,7 @@ export interface WeightModelRow {
   acceptedRange: string;
   recycleBelow: string;
   lastUpdated: string;
+  canDelete?: boolean;
 }
 
 // --- Verified reference models from phone specifications dataset ---
@@ -521,12 +522,20 @@ async function fetchWeightModels(): Promise<WeightModelRow[]> {
 
   try {
     const supabase = await createClient();
-    const { data: dbModels } = await supabase
-      .from("device_model")
-      .select("model_id, brand, model_name, device_type, baseline_weight_g, baseline_thickness_mm, nominal_current_ma")
-      .order("brand", { ascending: true });
+    const dbModels: Database["public"]["Tables"]["device_model"]["Row"][] = [];
+    const pageSize = 1000;
+    for (let offset = 0; ; offset += pageSize) {
+      const { data: page, error } = await supabase
+        .from("device_model")
+        .select("model_id, brand, model_name, device_type, baseline_weight_g, baseline_thickness_mm, nominal_current_ma, source")
+        .order("brand", { ascending: true })
+        .range(offset, offset + pageSize - 1);
+      if (error) return defaultModels;
+      dbModels.push(...(page ?? []));
+      if (!page || page.length < pageSize) break;
+    }
 
-    if (!dbModels || dbModels.length === 0) {
+    if (dbModels.length === 0) {
       return defaultModels;
     }
 
@@ -540,6 +549,7 @@ async function fetchWeightModels(): Promise<WeightModelRow[]> {
         acceptedRange: formatAcceptedRange(weight),
         recycleBelow: formatRecycleBelow(weight),
         lastUpdated: "02 Oct 2026",
+        canDelete: item.source === "operator-added",
       };
     });
   } catch {

@@ -93,9 +93,12 @@ npm ci
 npm run dev
 ```
 
-Open <http://localhost:3000/diagnostics>. The page is open without sign-in. It
-will say that no reports have arrived until telemetry is saved. Leave this
-terminal running. Stop it with `Ctrl+C`.
+Open <http://localhost:3000/diagnostics>. There is no sign-in screen anywhere
+in the dashboard; every visitor gets a silent anonymous Supabase Auth session
+automatically (requires "Allow anonymous sign-ins" enabled on the Supabase
+project, and `enable_anonymous_sign_ins = true` in `supabase/config.toml` for
+local dev). The page will say that no reports have arrived until telemetry is
+saved. Leave this terminal running. Stop it with `Ctrl+C`.
 
 ## 4. Start a development MQTT broker
 

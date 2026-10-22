@@ -62,9 +62,11 @@ migration `20261020020000` because firmware had no writer for it.
      requires selecting a saved phone reference, then instructs the operator
      to press the physical station START button. It polls for a new report;
      only readings with `readings.stable = true` are displayed or saved.
-   - Saving requires an authenticated operator and writes the model reference
-     and disposition to `operator_diagnosis`. This is an operator review, not
-     a firmware grade or safety determination.
+   - Saving writes the model reference and disposition to `operator_diagnosis`
+     under the visitor's session — every visitor gets a silent anonymous
+     Supabase Auth session automatically (`lib/supabase/ensure-user.ts`); there
+     is no sign-in step anywhere in the dashboard. This is an operator review,
+     not a firmware grade or safety determination.
 
 2. **Inventory Dashboard (`/inventory`)**:
    - Location: `dashboard/app/inventory/page.tsx` and

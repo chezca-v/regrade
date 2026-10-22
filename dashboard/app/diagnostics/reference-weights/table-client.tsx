@@ -1,12 +1,23 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import Link from "next/link";
 import type { WeightModelRow } from "./page";
 import { createClient } from "@/lib/supabase/client";
+import { ensureUser } from "@/lib/supabase/ensure-user";
 
 interface Props {
   initialModels: WeightModelRow[];
+}
+
+function errorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error) return error.message;
+  if (error !== null && typeof error === "object" && "message" in error && typeof error.message === "string") {
+    const details = "details" in error && typeof error.details === "string" ? error.details : "";
+    const hint = "hint" in error && typeof error.hint === "string" ? error.hint : "";
+    const code = "code" in error && typeof error.code === "string" ? ` (${error.code})` : "";
+    return [error.message + code, details, hint].filter(Boolean).join(" ");
+  }
+  return fallback;
 }
 
 function ChevronDownIcon() {
@@ -50,7 +61,9 @@ export default function ReferenceWeightsClient({ initialModels }: Props) {
   const [models, setModels] = useState(initialModels);
   const [formOpen, setFormOpen] = useState(false);
   const [formMessage, setFormMessage] = useState("");
+  const [deleteMessage, setDeleteMessage] = useState("");
   const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
   const [selectedBrand, setSelectedBrand] = useState("All brands");
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -101,8 +114,7 @@ export default function ReferenceWeightsClient({ initialModels }: Props) {
     }
     try {
       const client = createClient();
-      const { data: { user } } = await client.auth.getUser();
-      if (!user) throw new Error("Sign in first to add a shared phone reference.");
+      const user = await ensureUser(client);
       const { data, error } = await client.from("device_model").insert({
         brand, model_name: model, device_type: "phone", baseline_weight_g: weight,
         baseline_thickness_mm: thickness, nominal_current_ma: null, source: "operator-added", created_by: user.id,
@@ -112,9 +124,27 @@ export default function ReferenceWeightsClient({ initialModels }: Props) {
       setFormMessage("Reference saved for future sessions.");
       formElement.reset();
     } catch (error) {
-      setFormMessage(error instanceof Error ? error.message : "Could not save. Apply the operator phone references migration and try again.");
+      setFormMessage(errorMessage(error, "Could not save. Check the operator phone references migration and try again."));
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function deleteReference(item: WeightModelRow) {
+    if (!item.canDelete || !window.confirm(`Delete the saved reference ${item.brand} ${item.model}?`)) return;
+    setDeletingId(item.id);
+    setDeleteMessage("");
+    try {
+      const client = createClient();
+      const user = await ensureUser(client);
+      const { data, error } = await client.from("device_model").delete().eq("model_id", item.id).eq("created_by", user.id).select("model_id").maybeSingle();
+      if (error) throw error;
+      if (!data) throw new Error("Only the operator who added this reference can delete it.");
+      setModels((current) => current.filter((model) => model.id !== item.id));
+    } catch (error) {
+      setDeleteMessage(errorMessage(error, "Could not delete this reference."));
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -143,7 +173,7 @@ export default function ReferenceWeightsClient({ initialModels }: Props) {
         <label>Healthy reference weight (g)<input name="weight" type="number" min="1" step="0.1" required /></label>
         <label>Thickness (mm), optional<input name="thickness" type="number" min="0.1" step="0.1" /></label>
         <button className="rg-btn rg-btn--primary" type="submit" disabled={saving}>{saving ? "Saving…" : "Save phone reference"}</button>
-        {formMessage && <span className="rg-small" role="status">{formMessage} {formMessage.startsWith("Sign in") && <Link href="/login">Sign in</Link>}</span>}
+        {formMessage && <span className="rg-small" role="status">{formMessage}</span>}
       </form>}
 
       {/* Controls Toolbar */}
@@ -190,6 +220,7 @@ export default function ReferenceWeightsClient({ initialModels }: Props) {
 
       {/* Table */}
       <div className="rg-table-container">
+        {deleteMessage && <p className="rg-small" role="alert">{deleteMessage}</p>}
         <table className="rg-data-table">
           <thead>
             <tr>
@@ -199,13 +230,14 @@ export default function ReferenceWeightsClient({ initialModels }: Props) {
               <th>Accepted range (±5%)</th>
               <th>Recycle below (−15%)</th>
               <th>Last updated</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
             {paginatedModels.length === 0 ? (
               <tr>
                 <td
-                  colSpan={6}
+                  colSpan={7}
                   style={{
                     padding: "48px 16px",
                     textAlign: "center",
@@ -237,6 +269,7 @@ export default function ReferenceWeightsClient({ initialModels }: Props) {
 
                   {/* Last updated */}
                   <td>{item.lastUpdated}</td>
+                  <td>{item.canDelete && <button type="button" className="rg-btn" disabled={deletingId === item.id} onClick={() => void deleteReference(item)}>{deletingId === item.id ? "Deleting…" : "Delete"}</button>}</td>
                 </tr>
               ))
             )}

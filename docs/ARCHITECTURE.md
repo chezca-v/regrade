@@ -36,18 +36,18 @@ not actuate the sorter.
 
 ## Components
 
-| Layer | Component | Responsibility |
-| --- | --- | --- |
-| Control | ESP32-WROOM-32D / PlatformIO | Non-blocking session state machine, local UI, MQTT telemetry |
-| Weight | Load cell + HX711 | Device mass after calibration |
-| Geometry | VL53L0X ToF | External thickness estimate against a fixed bed reference |
-| Temperature | MLX90614 | Non-contact surface temperature and rise |
-| Electrical | INA219 and protected 5 V fixture | Input voltage/current measurement; fixture design is not enabled by this firmware |
-| UI/sorting | 16x2 I2C LCD, button, MG996R | Operator prompt and grade-bin diverter |
-| Messaging | MQTT over TLS | Diagnostic telemetry transport |
-| Ingestion | `cloud/mqtt-listener.py` | Validate, log, and upsert telemetry using a server-only Supabase key |
-| Dashboard | `dashboard/` (Next.js, TypeScript) | Public read-only station telemetry view; requires project configuration |
-| Persistence | Supabase REST API | Stores telemetry in `station_telemetry` |
+| Layer       | Component                          | Responsibility                                                                    |
+| ----------- | ---------------------------------- | --------------------------------------------------------------------------------- |
+| Control     | ESP32-WROOM-32D / PlatformIO       | Non-blocking session state machine, local UI, MQTT telemetry                      |
+| Weight      | Load cell + HX711                  | Device mass after calibration                                                     |
+| Geometry    | VL53L0X ToF                        | External thickness estimate against a fixed bed reference                         |
+| Temperature | MLX90614                           | Non-contact surface temperature and rise                                          |
+| Electrical  | INA219 and protected 5 V fixture   | Input voltage/current measurement; fixture design is not enabled by this firmware |
+| UI/sorting  | 16x2 I2C LCD, button, MG996R       | Operator prompt and grade-bin diverter                                            |
+| Messaging   | MQTT over TLS                      | Diagnostic telemetry transport                                                    |
+| Ingestion   | `cloud/mqtt-listener.py`           | Validate, log, and upsert telemetry using a server-only Supabase key              |
+| Dashboard   | `dashboard/` (Next.js, TypeScript) | Public read-only station telemetry view; requires project configuration           |
+| Persistence | Supabase REST API                  | Stores telemetry in `station_telemetry`                                           |
 
 The current UI design uses a 16x2 LCD with an I2C backpack. Confirm its I2C
 address and wiring on the assembled hardware. LM358/TL072 filter circuitry and
@@ -62,8 +62,7 @@ software substitutes for a properly isolated, current-limited fixture.
    readings end the session without a grade or servo action. A debounced
    stop-button press aborts straight to REPORT from any non-IDLE state.
 3. **GRADE**: require a valid approved threshold set, then classify.
-4. **SORT**: move the diverter only after a valid grade; wait without blocking.
-5. **REPORT**: publish diagnostic status when the broker is available and show
+4. **REPORT**: publish diagnostic status when the broker is available and show
    the outcome on the LCD.
 
 The loop services Wi-Fi/MQTT, the start/stop buttons, and incoming MQTT
@@ -74,16 +73,20 @@ and confirmed delivery have not been added.
 
 ## Telemetry
 
-The firmware publishes JSON at `regrade/<station-id>/diagnostics`. Fields
+The firmware publishes JSON at `regrade/<station-id>/diagnostics`. During a
+scan it publishes a `scanning` update about once per second with the latest
+sensor values, then publishes the final status on the same session. Fields
 include `session_id`, `station_id`, `status`, `grade`, `health_score`,
 `duration_ms`, `sort_success`, `fault`, and a `readings` object. An unavailable
 measurement is serialized as `null`; consumers must not interpret null as a
-passing measurement. The cloud listener upserts reports into
-`station_telemetry` when `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are
-configured. The dashboard reads this telemetry table without sign-in under a
-public read-only RLS policy; local and Vercel deployments show the same
-reports when they use the same Supabase project. Listener writes still
-require the server-only key.
+passing measurement. The cloud listener upserts both live updates and the final
+report into the same `station_telemetry` row when `SUPABASE_URL` and
+`SUPABASE_SERVICE_ROLE_KEY` are configured. During an active diagnostic, the
+dashboard polls that row once per second and shows a hideable live sensor feed;
+the values remain unvalidated until the scan completes. The dashboard reads
+this telemetry table without sign-in under a public read-only RLS policy;
+local and Vercel deployments show the same reports when they use the same
+Supabase project. Listener writes still require the server-only key.
 
 The firmware also subscribes to `regrade/<station-id>/command`. A signed-in
 operator's "Continue to station" on the diagnostics page queues a row in
@@ -107,7 +110,6 @@ policies model a single shared operator workspace, not multi-tenant access.
 - No load/current stimulus is implemented. The USB test fixture must be
   independently reviewed for 5 V limits, current limiting, overcurrent
   shutdown, fuse protection, isolation, thermal dissipation, and safe failure.
-- Power the MG996R from a suitable separate supply and share ground as required
   by the reviewed design; never power it from an ESP32 GPIO.
 - Do not rely on the default example configuration. Supply Wi-Fi/MQTT
   credentials and a trusted CA certificate outside version control.
